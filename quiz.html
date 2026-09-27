@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>우리 통했다?</title>
+<style>
+  :root {
+    --bg: #fff5f7;
+    --card: #ffffff;
+    --text: #3a2a30;
+    --muted: #9a7f88;
+    --pink: #ff5c8a;
+    --pink-soft: #ffe0e9;
+    --blue: #5c8aff;
+    --blue-soft: #e0e9ff;
+    --good: #2fb37a;
+    --bad: #e0556b;
+    --shadow: 0 8px 24px rgba(255, 92, 138, 0.15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1519;
+      --card: #2b2025;
+      --text: #f6e9ee;
+      --muted: #b89aa5;
+      --pink-soft: #4a2533;
+      --blue-soft: #25304a;
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    display: flex; justify-content: center;
+  }
+  #app { width: 100%; max-width: 480px; padding: 24px 16px 40px; }
+  h1 { font-size: 30px; text-align: center; margin: 24px 0 4px; }
+  h2 { font-size: 22px; text-align: center; margin: 8px 0 16px; line-height: 1.4; }
+  .sub { text-align: center; color: var(--muted); margin: 0 0 24px; }
+  .card {
+    background: var(--card); border-radius: 20px; padding: 20px;
+    box-shadow: var(--shadow); margin-bottom: 16px;
+  }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0 6px; }
+  input {
+    width: 100%; font-size: 17px; padding: 12px 14px; border-radius: 12px;
+    border: 2px solid var(--pink-soft); background: var(--bg); color: var(--text); outline: none;
+  }
+  input:focus { border-color: var(--pink); }
+  button {
+    font: inherit; border: none; cursor: pointer; width: 100%;
+    border-radius: 16px; padding: 16px; font-size: 17px; font-weight: 700;
+    transition: transform .08s;
+  }
+  button:active { transform: scale(0.97); }
+  .primary { background: var(--pink); color: #fff; margin-top: 12px; }
+  .ghost { background: transparent; color: var(--muted); font-weight: 500; margin-top: 8px; }
+  .mode { background: var(--card); color: var(--text); text-align: left; box-shadow: var(--shadow); margin-bottom: 12px; }
+  .mode b { display: block; font-size: 18px; margin-bottom: 4px; }
+  .mode span { color: var(--muted); font-size: 14px; font-weight: 400; }
+  .choices { display: grid; gap: 12px; }
+  .choice { background: var(--pink-soft); color: var(--text); padding: 22px 16px; font-size: 18px; }
+  .choice.b { background: var(--blue-soft); }
+  .who {
+    display: inline-block; padding: 4px 12px; border-radius: 99px;
+    background: var(--pink); color: #fff; font-size: 14px; font-weight: 700;
+  }
+  .who.p1 { background: var(--blue); }
+  .center { text-align: center; }
+  .progress { height: 6px; background: var(--pink-soft); border-radius: 99px; overflow: hidden; margin-bottom: 20px; }
+  .progress > div { height: 100%; background: var(--pink); transition: width .3s; }
+  .big { font-size: 64px; text-align: center; margin: 8px 0; }
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+  .answers div { background: var(--bg); border-radius: 12px; padding: 12px; text-align: center; }
+  .answers small { display: block; color: var(--muted); margin-bottom: 4px; }
+  .ok { color: var(--good); } .no { color: var(--bad); }
+  .score { font-size: 56px; font-weight: 800; text-align: center; color: var(--pink); margin: 8px 0; }
+  .pop { animation: pop .35s ease; }
+  @keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ---------- 문제 데이터 ----------
+const BALANCE = [
+  ["평생 여름", "평생 겨울"],
+  ["바다 여행", "산 여행"],
+  ["짜장면", "짬뽕"],
+  ["집 데이트", "밖 데이트"],
+  ["아침형 인간", "저녁형 인간"],
+  ["연락 자주", "만나서 몰아서 대화"],
+  ["깻잎 떼주기 OK", "깻잎 떼주기 NO"],
+  ["기념일 서프라이즈", "같이 계획한 기념일"],
+  ["매일 보는 대신 1시간", "일주일에 한 번 하루 종일"],
+  ["부먹", "찍먹"],
+  ["고양이", "강아지"],
+  ["놀이공원", "전시회"],
+  ["계획형 여행", "즉흥 여행"],
+  ["로맨스 영화", "공포 영화"],
+  ["민트초코 좋아", "민트초코 싫어"],
+  ["싸우면 바로 풀기", "시간 두고 풀기"],
+  ["연인의 과거 궁금함", "연인의 과거 안 궁금함"],
+  ["손 편지", "깜짝 선물"],
+  ["캠핑", "호캉스"],
+  ["평생 치킨 금지", "평생 피자 금지"],
+  ["애칭 부르기", "이름 부르기"],
+  ["커플템 좋아", "커플템 부끄러워"],
+  ["먼저 고백하기", "고백 받기"],
+  ["단둘이 해외여행", "친구들이랑 국내여행"],
+  ["넷플릭스 정주행", "게임 같이 하기"],
+  ["라면에 계란 넣기", "라면은 라면만"],
+  ["노래방 가서 열창", "코인노래방도 부끄러움"],
+  ["사진 많이 찍기", "눈으로 담기"],
+  ["달달한 디저트", "매운 음식"],
+  ["연애 공개", "연애 비공개"],
+];
+
+const TALK = [
+  "우리가 처음 만났을 때 첫인상은 어땠어?",
+  "나랑 있을 때 가장 설렜던 순간은?",
+  "내가 가장 귀여울 때는 언제야?",
+  "우리 둘이 꼭 가보고 싶은 여행지는?",
+  "나한테 고마웠지만 말 못 했던 거 있어?",
+  "10년 후 우리는 어떤 모습일까?",
+  "내 습관 중에 고쳐줬으면 하는 거 하나만!",
+  "나를 동물로 비유하면?",
+  "지금까지 우리 데이트 중 최고는?",
+  "나를 처음 좋아하게 된 순간은?",
+  "서운했는데 그냥 넘어갔던 일 있어?",
+  "나한테 듣고 싶은 말 한마디는?",
+  "우리 커플만의 규칙을 하나 만든다면?",
+  "내가 해준 음식(또는 선물) 중 최고는?",
+  "우리 연애를 영화 제목으로 짓는다면?",
+  "다시 태어나도 나 만날 거야? 이유는?",
+  "요즘 가장 큰 고민은 뭐야?",
+  "나랑 꼭 해보고 싶은 버킷리스트 3개!",
+  "나의 어떤 점이 가장 좋아?",
+  "오늘 하루 중 제일 좋았던 순간은?",
+];
+
+// ---------- 상태 ----------
+const S = {
+  names: ["", ""],
+  mode: null,
+  qs: [],
+  round: 0,
+  total: 10,
+  picks: [null, null],
+  match: 0,          // 텔레파시 일치 수
+  correct: [0, 0],   // 맞혀봐: 각자 맞힌 수
+};
+
+const app = document.getElementById("app");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const tag = i => `<span class="who ${i === 0 ? "p1" : ""}">${esc(S.names[i])}</span>`;
+const bar = () => `<div class="progress"><div style="width:${(S.round / S.total) * 100}%"></div></div>`;
+
+function render(html) {
+  app.innerHTML = `<div class="pop">${html}</div>`;
+  window.scrollTo(0, 0);
+}
+
+// ---------- 화면 ----------
+function home() {
+  try { const saved = JSON.parse(localStorage.getItem("couple-names") || "null"); if (saved) S.names = saved; } catch (e) {}
+  render(`
+    <h1>💞 우리 통했다?</h1>
+    <p class="sub">폰 하나로 둘이 번갈아 하는 커플 게임</p>
+    <div class="card">
+      <label>플레이어 1</label><input id="n0" placeholder="예: 지우" value="${esc(S.names[0])}" maxlength="10">
+      <label>플레이어 2</label><input id="n1" placeholder="예: 민지" value="${esc(S.names[1])}" maxlength="10">
+    </div>
+    <button class="mode" data-m="tele"><b>🔮 텔레파시</b><span>둘이 몰래 고르고, 같은 답이면 통한 거! 우리 싱크로율은?</span></button>
+    <button class="mode" data-m="guess"><b>🕵️ 나를 맞혀봐</b><span>상대가 뭘 골랐을지 맞히기. 누가 더 잘 알고 있을까?</span></button>
+    <button class="mode" data-m="talk"><b>💬 속마음 카드</b><span>점수 없이, 서로에게 묻고 답하는 대화 카드</span></button>
+  `);
+  app.querySelectorAll(".mode").forEach(b => b.onclick = () => {
+    const n0 = document.getElementById("n0").value.trim() || "플레이어1";
+    const n1 = document.getElementById("n1").value.trim() || "플레이어2";
+    S.names = [n0, n1];
+    try { localStorage.setItem("couple-names", JSON.stringify(S.names)); } catch (e) {}
+    start(b.dataset.m);
+  });
+}
+
+function start(mode) {
+  S.mode = mode; S.round = 0; S.match = 0; S.correct = [0, 0];
+  S.qs = shuffle(mode === "talk" ? TALK : BALANCE);
+  S.total = mode === "talk" ? S.qs.length : 10;
+  mode === "talk" ? talk() : ask(0);
+}
+
+// 텔레파시: p1 → 넘기기 → p2 → 결과
+// 맞혀봐: 짝수 라운드는 p1이 답/p2가 추측, 홀수 라운드는 반대
+function answerer() { return S.mode === "guess" ? S.round % 2 : 0; }
+
+function ask(step) {
+  const q = S.qs[S.round];
+  const first = answerer();
+  const player = step === 0 ? first : 1 - first;
+  let prompt;
+  if (S.mode === "tele") prompt = "몰래 골라주세요 🤫";
+  else if (step === 0) prompt = "나는 뭘 좋아할까? 솔직하게! 🤫";
+  else prompt = `${esc(S.names[first])}은(는) 뭘 골랐을까? 🤔`;
+
+  render(`
+    ${bar()}
+    <p class="center">${S.round + 1} / ${S.total} · ${tag(player)} 차례</p>
+    <h2>${prompt}</h2>
+    <div class="choices">
+      <button class="choice" data-c="0">${esc(q[0])}</button>
+      <div class="center" style="color:var(--muted)">VS</div>
+      <button class="choice b" data-c="1">${esc(q[1])}</button>
+    </div>
+  `);
+  app.querySelectorAll(".choice").forEach(b => b.onclick = () => {
+    S.picks[step] = +b.dataset.c;
+    step === 0 ? handoff(1 - first, () => ask(1)) : reveal();
+  });
+}
+
+function handoff(to, next) {
+  render(`
+    <div class="card center" style="margin-top:60px">
+      <div class="big">📱</div>
+      <h2>${tag(to)} 에게<br>폰을 넘겨주세요</h2>
+      <p class="sub">답을 보지 않기로 약속! 🙈</p>
+      <button class="primary" id="go">받았어요</button>
+    </div>
+  `);
+  document.getElementById("go").onclick = next;
+}
+
+function reveal() {
+  const q = S.qs[S.round];
+  const same = S.picks[0] === S.picks[1];
+  const first = answerer();
+  let title, emoji;
+  if (S.mode === "tele") {
+    if (same) S.match++;
+    emoji = same ? "💘" : "💔";
+    title = same ? "통했다!" : "엇갈렸다…";
+  } else {
+    if (same) S.correct[1 - first]++;
+    emoji = same ? "🎯" : "🙅";
+    title = same ? `${esc(S.names[1 - first])} 정답!` : "땡! 아직 모르는구나";
+  }
+  const labelA = S.mode === "tele" ? esc(S.names[0]) : `${esc(S.names[first])}의 답`;
+  const labelB = S.mode === "tele" ? esc(S.names[1]) : `${esc(S.names[1 - first])}의 추측`;
+  S.round++;
+  const last = S.round >= S.total;
+  render(`
+    ${bar()}
+    <div class="card center">
+      <div class="big">${emoji}</div>
+      <h2 class="${same ? "ok" : "no"}">${title}</h2>
+      <div class="answers">
+        <div><small>${labelA}</small>${esc(q[S.picks[0]])}</div>
+        <div><small>${labelB}</small>${esc(q[S.picks[1]])}</div>
+      </div>
+      <p class="sub" style="margin:8px 0 0">💬 왜 그걸 골랐는지 서로 얘기해 보세요</p>
+      <button class="primary" id="next">${last ? "결과 보기" : "다음 문제"}</button>
+    </div>
+  `);
+  document.getElementById("next").onclick = () => {
+    if (last) return result();
+    handoff(answerer(), () => ask(0));
+  };
+}
+
+function result() {
+  let body;
+  if (S.mode === "tele") {
+    const pct = Math.round((S.match / S.total) * 100);
+    const msg =
+      pct >= 90 ? "영혼의 단짝! 사실 한 사람 아니에요? 👯" :
+      pct >= 70 ? "찰떡 커플! 눈빛만 봐도 통해요 💕" :
+      pct >= 50 ? "딱 좋은 밸런스! 다른 점이 매력이에요 😊" :
+      pct >= 30 ? "서로 알아갈 게 많은 커플! 그래서 더 재밌죠 🌱" :
+                  "정반대 매력! 서로를 채워주는 사이 🧲";
+    body = `<p class="sub">우리 싱크로율</p><div class="score">${pct}%</div><h2>${msg}</h2>`;
+  } else {
+    const [a, b] = S.correct, half = S.total / 2;
+    const win = a === b ? "무승부! 둘 다 서로를 잘 알고 있네요 🤝"
+      : `${esc(S.names[a > b ? 0 : 1])} 승리! 상대를 더 잘 아는 사람 🏆`;
+    body = `
+      <div class="answers">
+        <div><small>${esc(S.names[0])}</small><b style="font-size:28px">${a} / ${half}</b></div>
+        <div><small>${esc(S.names[1])}</small><b style="font-size:28px">${b} / ${half}</b></div>
+      </div>
+      <h2>${win}</h2>
+      <p class="sub">진 사람이 오늘 음료 사기 ☕</p>`;
+  }
+  render(`
+    <div class="card center" style="margin-top:40px">
+      <div class="big">🎉</div>
+      ${body}
+      <button class="primary" id="again">한 판 더</button>
+      <button class="ghost" id="home">처음으로</button>
+    </div>
+  `);
+  document.getElementById("again").onclick = () => start(S.mode);
+  document.getElementById("home").onclick = home;
+}
+
+function talk() {
+  const q = S.qs[S.round % S.qs.length];
+  const who = S.round % 2;
+  render(`
+    <p class="center">${tag(who)} 이(가) 대답할 차례</p>
+    <div class="card center" style="padding:40px 20px">
+      <div class="big">💌</div>
+      <h2>${esc(q)}</h2>
+    </div>
+    <button class="primary" id="next">다음 카드</button>
+    <button class="ghost" id="home">그만하기</button>
+  `);
+  document.getElementById("next").onclick = () => { S.round++; talk(); };
+  document.getElementById("home").onclick = home;
+}
+
+home();
+</script>
+</body>
+</html>

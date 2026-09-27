@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#120e1f">
+<title>등불과 곡괭이</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏮</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="screen"></canvas>
+
+<!-- 타이틀 / 로비 (DOM: 한글 입력을 위해) -->
+<div id="front" class="overlay">
+  <div class="front-inner">
+    <div class="logo">
+      <div class="logo-icons"><span class="bob1">🐰</span><span class="lamp">🏮</span><span class="pick">⛏️</span><span class="bob2">🐹</span></div>
+      <h1>등불과 곡괭이</h1>
+      <p class="tag">둘이 함께 파 내려가는 반짝이는 동굴 원정</p>
+    </div>
+
+    <div id="pane-main" class="pane">
+      <div class="names">
+        <label><span class="dot p1"></span><input id="name0" maxlength="8" placeholder="1P 이름"></label>
+        <label><span class="dot p2"></span><input id="name1" maxlength="8" placeholder="2P 이름"></label>
+      </div>
+      <button class="btn big pink" id="btn-local">🎮 한 키보드로 둘이 하기</button>
+      <div class="row">
+        <button class="btn big blue" id="btn-host">🌐 온라인 방 만들기</button>
+        <button class="btn big blue" id="btn-join">🔑 방 참가하기</button>
+      </div>
+      <div class="row small">
+        <button class="btn ghost" id="btn-export">💾 추억 백업</button>
+        <button class="btn ghost" id="btn-import">📂 백업 불러오기</button>
+        <button class="btn ghost" id="btn-help">❓ 조작법</button>
+      </div>
+      <p class="hint" id="save-hint"></p>
+    </div>
+
+    <div id="pane-host" class="pane hidden">
+      <p class="label">방 코드를 상대에게 알려주세요</p>
+      <div class="code" id="host-code">····</div>
+      <button class="btn ghost" id="btn-copy">📋 초대 링크 복사</button>
+      <p class="status" id="host-status">방을 여는 중…</p>
+      <p class="hint">진행 상황(굴집·앨범)은 <b>방장 기기</b>에 저장돼요.</p>
+      <button class="btn ghost" id="btn-host-back">← 돌아가기</button>
+    </div>
+
+    <div id="pane-join" class="pane hidden">
+      <p class="label">내 이름</p>
+      <input id="join-name" maxlength="8" placeholder="이름">
+      <p class="label">방 코드</p>
+      <input id="join-code" maxlength="4" placeholder="ABCD" class="code-input" autocomplete="off">
+      <button class="btn big pink" id="btn-join-go">들어가기</button>
+      <p class="status" id="join-status"></p>
+      <button class="btn ghost" id="btn-join-back">← 돌아가기</button>
+    </div>
+
+    <div id="pane-help" class="pane hidden">
+      <table class="keys">
+        <tr><th></th><th>1P</th><th>2P</th></tr>
+        <tr><td>이동</td><td>W A S D</td><td>← ↑ ↓ →</td></tr>
+        <tr><td>공격 / 확인</td><td>C 또는 Space</td><td>. 또는 Enter</td></tr>
+        <tr><td>스킬 / 취소</td><td>V</td><td>/</td></tr>
+        <tr><td>합동기 💞</td><td>B</td><td>,</td></tr>
+        <tr><td>일시정지</td><td colspan="2">Esc 또는 P</td></tr>
+      </table>
+      <p class="hint">온라인에서는 WASD/방향키 아무거나, 공격 C·J·Space, 스킬 V·K, 합동기 B·L.<br>게임패드와 휴대폰 터치도 지원해요.</p>
+      <button class="btn ghost" id="btn-help-back">← 돌아가기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 연결 끊김 등 알림 -->
+<div id="notice" class="overlay hidden">
+  <div class="notice-box">
+    <p id="notice-text"></p>
+    <div id="notice-btns"></div>
+  </div>
+</div>
+
+<!-- 설정 (기기별) -->
+<button id="gear" title="설정">⚙️</button>
+<div id="settings" class="hidden">
+  <h3>설정 <small>(이 기기에만 적용)</small></h3>
+  <label>전체 소리 <input type="range" id="set-master" min="0" max="100"></label>
+  <label>배경음악 <input type="range" id="set-music" min="0" max="100"></label>
+  <label>효과음 <input type="range" id="set-sfx" min="0" max="100"></label>
+  <label class="chk"><input type="checkbox" id="set-shake"> 화면 흔들림</label>
+  <label class="chk"><input type="checkbox" id="set-dmg"> 피해 숫자 표시</label>
+  <p class="hint">M / Tab: 미니맵 · Esc / P: 일시정지</p>
+  <button class="btn ghost" id="set-close">닫기</button>
+</div>
+
+<!-- 터치 조작 -->
+<div id="touch" class="hidden">
+  <div id="stick"><div id="knob"></div></div>
+  <div id="tbtns">
+    <button data-b="c" class="tb small">💞</button>
+    <button data-b="s" class="tb">✨</button>
+    <button data-b="a" class="tb big">⚔️</button>
+    <button data-b="p" class="tb tiny">⏸</button>
+  </div>
+</div>
+
+<input type="file" id="file-import" accept=".json,application/json" hidden>
+
+<script src="lib/peerjs.min.js"></script>
+<script src="src/config.js"></script>
+<script src="src/util.js"></script>
+<script src="src/data/chars.js"></script>
+<script src="src/data/cards.js"></script>
+<script src="src/data/enemies.js"></script>
+<script src="src/data/meta.js"></script>
+<script src="src/gfx/sprites.js"></script>
+<script src="src/gfx/render.js"></script>
+<script src="src/gfx/draw.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/input.js"></script>
+<script src="src/net.js"></script>
+<script src="src/save.js"></script>
+<script src="src/game/world.js"></script>
+<script src="src/game/combat.js"></script>
+<script src="src/game/enemyai.js"></script>
+<script src="src/game/bosses.js"></script>
+<script src="src/game/run.js"></script>
+<script src="src/game/hub.js"></script>
+<script src="src/ui/ui.js"></script>
+<script src="src/ui/hud.js"></script>
+<script src="src/ui/menus.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
