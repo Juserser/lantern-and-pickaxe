@@ -124,9 +124,17 @@ G.R = (function () {
     cx.clearRect(X, Y, S, S);
     if (!solid(t) || t === T.BOULDER) {
       // 바닥
-      const base = t === T.LAVA ? '#b8401e' : pal.floor[Math.floor(h0 * 3)];
+      const base = t === T.LAVA ? '#b8401e' : t === T.ICE ? '#86c0e4' : pal.floor[Math.floor(h0 * 3)];
       px(cx, X, Y, S, S, base);
-      if (t !== T.LAVA) {
+      if (t === T.ICE) {
+        // 반짝이는 얼음
+        const at2 = (i, j) => (i < 0 || j < 0 || i >= map.w || j >= map.h) ? T.BEDROCK : map.tiles[j * map.w + i];
+        px(cx, X + 2 + Math.floor(h0 * 8), Y + 3, 4, 1, '#d8f0ff'); px(cx, X + 3 + Math.floor(h0 * 8), Y + 4, 2, 1, '#d8f0ff');
+        px(cx, X + 9, Y + 10 + Math.floor(hash(x, y, 7) * 3), 3, 1, '#b8e0f8'); px(cx, X + 12, Y + 5, 1, 1, '#ffffff');
+        if (at2(x, y - 1) !== T.ICE) px(cx, X, Y, S, 1, '#c8e8fa');
+        if (at2(x, y + 1) !== T.ICE) px(cx, X, Y + 15, S, 1, '#5a90b8');
+      }
+      if (t !== T.LAVA && t !== T.ICE) {
         for (let k = 0; k < 5; k++) {
           const hx = Math.floor(hash(x, y, 10 + k) * 16), hy = Math.floor(hash(x, y, 20 + k) * 16);
           px(cx, X + hx, Y + hy, 1, 1, k % 2 ? pal.floor[2] : pal.floor[1]);
@@ -194,6 +202,12 @@ G.R = (function () {
       case 'st': px(cx, x - 1, y, 3, 1, '#d7a8ff'); px(cx, x, y - 1, 1, 3, '#d7a8ff'); px(cx, x, y, 1, 1, '#ffffff'); break;
       case 'em': px(cx, x - 1, y - 1, 3, 2, '#3a2020'); px(cx, x, y - 1, 1, 1, '#ff7a2e'); break;
       case 'hint': px(cx, x, y, 1, 1, '#fff3a0'); px(cx, x + 2, y + 3, 1, 1, '#ffffff'); break;
+      case 'rail':
+        for (let i = 0; i < 4; i++) px(cx, x - 8 + i * 4 + 1, y - 5, 2, 10, '#6b4a30');
+        px(cx, x - 8, y - 4, 16, 1, '#a8a8b8'); px(cx, x - 8, y + 3, 16, 1, '#a8a8b8');
+        px(cx, x - 8, y - 3, 16, 1, 'rgba(0,0,0,0.35)'); px(cx, x - 8, y + 4, 16, 1, 'rgba(0,0,0,0.35)');
+        break;
+      case 'sn': px(cx, x - 2, y - 1, 5, 2, '#e8f4ff'); px(cx, x - 1, y - 2, 3, 1, '#ffffff'); break;
       case 'lamp': px(cx, x, y - 16, 1, 10, '#3a2a20'); px(cx, x - 3, y - 7, 7, 1, '#3a2a20'); px(cx, x - 3, y - 6, 7, 5, '#ffd36b'); px(cx, x - 2, y - 5, 5, 3, '#fff3c0'); px(cx, x - 3, y - 1, 7, 1, '#3a2a20'); break;
     }
   }

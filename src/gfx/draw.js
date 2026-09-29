@@ -134,6 +134,20 @@ G.D = (function () {
         circO(bx + Math.cos(ang) * 8, by + Math.sin(ang) * 8, 3, '#3a3a44');
         break;
       }
+      case 'staff': {
+        const ang = p.at > 0 ? a - 0.6 + (1 - p.at) * 1.2 : (f > 0 ? -1.2 : Math.PI + 1.2);
+        const bx = x + f * 5, by = y - 3;
+        const ex = bx + Math.cos(ang) * 11, ey = by + Math.sin(ang) * 11;
+        line(bx, by, ex, ey, '#8a5a3c', 1);
+        circ(ex, ey, 2, '#d7a8ff'); rect(ex, ey - 1, 1, 1, '#ffffff');
+        if (Math.floor(t * 6) % 2) rect(ex + 2, ey - 3, 1, 1, '#fff3a0');
+        break;
+      }
+      case 'snow': {
+        if (p.at > 0.4) break;
+        circO(x + f * 7, y - 3, 2, '#ffffff'); rect(x + f * 6, y - 4, 1, 1, '#e0f4ff');
+        break;
+      }
       case 'shield': {
         if (p.at > 0.3) { ctx.strokeStyle = 'rgba(200,255,200,' + (p.at * 0.8).toFixed(2) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y - 4, 16 * (p.ar || 1), a - 1.2, a + 1.2); ctx.stroke(); }
         break;
@@ -301,7 +315,81 @@ G.D = (function () {
     if (e[7] === 1) { ctx.globalAlpha = 0.5 + Math.sin(t * 20) * 0.3; circ(x, fy, 9, '#ffd6f5'); ctx.globalAlpha = 1; }
   };
 
-  // e = [id, type, x, y, flags, hpFrac, facing, anim]
+  EN.icebat = EN.bat;
+  EN.goldmole = (x, y, e, t, c) => {
+    const f = e[6] || 1, bob = e[7] === 1 ? Math.abs(Math.sin(t * 16)) * 1.5 : 0;
+    shadow(x, y + 3, 7);
+    circO(x - f * 4, y - 6 - bob, 4, '#c9a14a');
+    rect(x - f * 4 - 1, y - 11 - bob, 3, 2, '#8a6a2a'); rect(x - f * 4, y - 7 - bob, 1, 2, '#ffd36b');
+    ellO(x, y - 3 - bob, 5, 4, c[0]);
+    ell(x + f * 2, y - 2 - bob, 3, 2, '#e8c39e');
+    rect(x + f * 3, y - 5 - bob, 1, 1, '#1a1020');
+    circ(x + f * 5, y - 3 - bob, 1, '#ff9eb5');
+    rect(x - 3, y + 1, 2, 1, '#e8c39e'); rect(x + 2, y + 1, 2, 1, '#e8c39e');
+    if (Math.floor(t * 8 + e[0]) % 3 === 0) rect(x - f * 7, y - 13 - bob, 1, 1, '#fff3a0');
+  };
+  EN.mimic = (x, y, e, t, c) => {
+    const hop = e[7] === 1 ? Math.abs(Math.sin(t * 8)) * 5 : 0, open = e[7] ? 3 : 1, yy = y - hop;
+    shadow(x, y + 3, 8);
+    rect(x - 8, yy - 9, 16, 12, '#1a1020'); rect(x - 7, yy - 8, 14, 10, c[0]); rect(x - 7, yy - 4, 14, 2, '#ffd36b');
+    rect(x - 7, yy - 11 - open, 14, 4, '#1a1020'); rect(x - 6, yy - 10 - open, 12, 3, '#c9955a');
+    rect(x - 6, yy - 8, 12, open, '#5a1020');
+    for (let i = 0; i < 4; i++) { rect(x - 6 + i * 3, yy - 8, 1, 1, '#ffffff'); rect(x - 5 + i * 3, yy - 9 + open, 1, 1, '#ffffff'); }
+    if (open > 1) rect(x - 1, yy - 7, 3, 2, '#ff7aa8');
+    rect(x - 4, yy - 12 - open, 1, 1, c[1]); rect(x + 3, yy - 12 - open, 1, 1, c[1]);
+  };
+  EN.snowman = (x, y, e, t, c) => {
+    const f = e[6] || 1;
+    shadow(x, y + 3, 6);
+    circO(x, y - 3, 5, c[0]); circO(x, y - 10, 4, c[0]);
+    rect(x - 1, y - 11, 1, 1, '#1a1020'); rect(x + 1, y - 11, 1, 1, '#1a1020'); rect(x + f * 2, y - 10, 2, 1, c[1]);
+    rect(x - 4, y - 14, 9, 1, '#3a2a30'); rect(x - 2, y - 17, 5, 3, '#3a2a30');
+    rect(x, y - 4, 1, 1, '#3a3a5a'); rect(x, y - 2, 1, 1, '#3a3a5a');
+    rect(x - 4, y - 7, 9, 1, '#ff5c7a');
+    if (e[7] === 2) circO(x + f * 7, y - 9, 2, '#ffffff');
+  };
+  EN.seal = (x, y, e, t, c) => {
+    const f = e[6] || 1;
+    shadow(x, y + 3, 9);
+    ellO(x, y - 3, 8, 4, c[0]); ellO(x + f * 6, y - 6, 4, 3, c[0]);
+    rect(x + f * 7, y - 7, 1, 1, '#1a1020'); rect(x + f * 9, y - 6, 1, 1, c[1]);
+    rect(x - f * 10, y - 3, 3, 2, c[1]); rect(x - 2, y, 3, 1, c[1]);
+    rect(x - 3, y - 5, 1, 1, '#ffffff'); rect(x + 1, y - 4, 1, 1, '#ffffff');
+  };
+  EN.bee = (x, y, e, t, c) => {
+    const f = e[6] || 1, fy = y - 9 + Math.sin(t * 9 + e[0]) * 2, w = Math.sin(t * 40) > 0;
+    shadow(x, y + 2, 3);
+    ctx.globalAlpha = 0.7; rect(x - 3, fy - 4 - (w ? 1 : 0), 3, 2, '#ffffff'); rect(x + 1, fy - 4 - (w ? 1 : 0), 3, 2, '#ffffff'); ctx.globalAlpha = 1;
+    ellO(x, fy, 4, 3, c[0]); rect(x - 1, fy - 2, 1, 5, c[1]); rect(x + 2, fy - 2, 1, 5, c[1]);
+    rect(x + f * 3, fy - 1, 1, 1, '#1a1020'); rect(x - f * 5, fy, 1, 1, '#1a1020');
+  };
+  EN.flowertrap = (x, y, e, t, c) => {
+    shadow(x, y + 3, 7);
+    rect(x, y - 6, 1, 8, '#3a8a3a'); ellO(x - 4, y, 3, 1, c[1]); ellO(x + 4, y, 3, 1, c[1]);
+    const hy = y - 10;
+    for (let i = 0; i < 6; i++) { const a = i * TAU / 6 + t * 0.8; circ(x + Math.cos(a) * 5, hy + Math.sin(a) * 4, 3, c[0]); }
+    circO(x, hy, 3, '#ffd24a');
+    if (e[7] === 2) { rect(x - 2, hy, 5, 2, '#5a1020'); rect(x - 2, hy, 1, 1, '#ffffff'); rect(x + 2, hy, 1, 1, '#ffffff'); }
+    else { rect(x - 1, hy - 1, 1, 1, '#1a1020'); rect(x + 1, hy - 1, 1, 1, '#1a1020'); }
+  };
+  EN.ladybug = (x, y, e, t, c) => {
+    const f = e[6] || 1, hop = e[7] === 1 ? Math.abs(Math.sin(t * 8)) * 4 : 0, yy = y - hop;
+    shadow(x, y + 3, 6);
+    ellO(x, yy - 4, 6, 5, c[0]); rect(x, yy - 9, 1, 9, c[1]);
+    circ(x - 3, yy - 5, 1, c[1]); circ(x + 3, yy - 3, 1, c[1]); circ(x + 3, yy - 7, 1, c[1]); circ(x - 3, yy - 2, 1, c[1]);
+    circO(x + f * 6, yy - 4, 2, c[1]); rect(x + f * 6, yy - 5, 1, 1, '#ffffff');
+  };
+  EN.butterfly = (x, y, e, t, c) => {
+    const fy = y - 10 + Math.sin(t * 4 + e[0]) * 2;
+    if (e[7] === 1) ctx.globalAlpha = 0.4;
+    shadow(x, y + 2, 3);
+    const w = Math.abs(Math.sin(t * 10)) * 3 + 1;
+    ell(x - 3, fy - 1, w, 4, c[0]); ell(x + 3, fy - 1, w, 4, c[0]); ell(x - 2, fy + 3, w * 0.6, 2, c[1]); ell(x + 2, fy + 3, w * 0.6, 2, c[1]);
+    rect(x, fy - 3, 1, 7, '#3a2a30'); rect(x - 1, fy - 5, 1, 2, '#3a2a30'); rect(x + 1, fy - 5, 1, 2, '#3a2a30');
+    ctx.globalAlpha = 1;
+  };
+
+  // e = [id, type, x, y, flags, hpFrac, facing, anim, affix]
   // flags: 1 hit, 2 slow, 4 burn, 8 stun, 16 elite, 32 frozen, 64 inLight
   D.enemy = function (e, t) {
     const x = Math.round(sx(e[2])), y = Math.round(sy(e[3]));
@@ -309,10 +397,24 @@ G.D = (function () {
     const def = G.ENEMIES[e[1]]; if (!def) return;
     const fn = EN[e[1]] || EN.mushroom;
     const fl = e[4];
-    if (fl & 16) { ctx.globalAlpha = 0.35 + Math.sin(t * 6) * 0.15; circ(x, y - 4, def.r + 5, '#ffd36b'); ctx.globalAlpha = 1; }
+    const aff = e[8] ? G.AFFIX_KEYS[e[8] - 1] : null, acol = aff ? G.AFFIXES[aff].col : '#ffd36b';
+    const small = fl & 128;
+    if (small) { ctx.save(); ctx.translate(x, y); ctx.scale(0.7, 0.7); ctx.translate(-x, -y); }
+    if (fl & 16) { ctx.globalAlpha = 0.35 + Math.sin(t * 6) * 0.15; circ(x, y - 4, def.r + 5, acol); ctx.globalAlpha = 1; }
+    const ghost = aff === 'ghost' && !(fl & 64);
     FL = (fl & 1) ? '#ffffff' : (fl & 32) ? '#bfefff' : null;
+    if (ghost) ctx.globalAlpha = 0.28;
     fn(x, y, e, t, def.col);
+    ctx.globalAlpha = 1;
     FL = null;
+    if (small) ctx.restore();
+    if (aff) {
+      const ay = y - def.r * 2 - 9;
+      rect(x - 11, ay, 3, 3, '#1a1020'); rect(x - 10, ay + 1, 1, 1, acol);
+      if (aff === 'fire' && Math.floor(t * 8) % 2) rect(x + ((t * 30) % 10) - 5, y - 16, 1, 1, '#ff7a2e');
+      if (aff === 'ice') rect(x + Math.cos(t * 3) * 7, y - 6 + Math.sin(t * 3) * 3, 1, 1, '#bfefff');
+      if (aff === 'swift') rect(x - (e[6] || 1) * (6 + ((t * 40) % 6)), y - 4, 2, 1, '#ffe36b');
+    }
     if (fl & 2) { rect(x - 3, y + 2, 1, 1, '#8fd8ff'); rect(x + 3, y + 1, 1, 1, '#8fd8ff'); }
     if (fl & 8) { for (let i = 0; i < 3; i++) { const a = t * 6 + i * 2.1; rect(x + Math.cos(a) * 5, y - 14 + Math.sin(a) * 2, 1, 1, '#ffe36b'); } }
     if ((fl & 16) && e[5] < 1) { rect(x - 7, y - def.r * 2 - 8, 14, 2, '#1a1020'); rect(x - 7, y - def.r * 2 - 8, Math.round(14 * e[5]), 2, '#ffd36b'); }
@@ -342,6 +444,24 @@ G.D = (function () {
       case 'rock': shadow(x, y + 1, 5); circO(x, y - 5 - z, 4, '#8d7b6a'); rect(x - 2, y - 7 - z, 2, 2, '#b5a390'); break;
       case 'wstar': circ(x, y - 6, 3, '#d7a8ff'); rect(x - 4, y - 6, 9, 1, '#fff'); rect(x, y - 10, 1, 9, '#fff'); break;
       case 'bubble': ctx.globalAlpha = 0.8; circ(x, y - 6, 4, '#8fd8ff'); circ(x - 1, y - 7, 1, '#fff'); ctx.globalAlpha = 1; break;
+      case 'rune': {
+        const hot = p[6];
+        ctx.strokeStyle = hot ? '#ffffff' : '#d7a8ff'; ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.ellipse(x + 0.5, y + 0.5, 13, 7, 0, 0, TAU); ctx.stroke();
+        for (let i = 0; i < 5; i++) { const aa = t * 3 + i * TAU / 5; rect(x + Math.cos(aa) * 9, y + Math.sin(aa) * 4.5, 1, 1, '#fff3a0'); }
+        ctx.globalAlpha = 1; break;
+      }
+      case 'meteor': {
+        shadow(x, y + 1, 5); ctx.globalAlpha = 0.4; circ(x, y, 3, '#fff3a0'); ctx.globalAlpha = 1;
+        const zz = y - 6 - z;
+        rect(x + 3, zz - 6, 2, 2, '#ffd36b'); rect(x + 5, zz - 9, 1, 1, '#ffd36b');
+        circ(x, zz, 3, '#fff3a0'); rect(x - 1, zz - 1, 2, 2, '#ffffff'); break;
+      }
+      case 'snow': circO(x, y - 5, 2, '#ffffff'); rect(x - 1, y - 6, 1, 1, '#e0f4ff'); break;
+      case 'bigsnow': shadow(x, y + 2, 9); circO(x, y - 8, 8, '#ffffff'); circ(x - 3, y - 11, 2, '#e0f4ff'); rect(x + 2, y - 5, 2, 1, '#c8dcf0'); break;
+      case 'petal': ctx.save(); ctx.translate(x, y - 5); ctx.rotate(t * 6 + p[0]); rect(-2, -1, 4, 2, '#ff9eb5'); rect(-1, -1, 1, 1, '#ffffff'); ctx.restore(); break;
+      case 'honeyball': shadow(x, y + 1, 4); circO(x, y - 5 - z, 3, '#ffc83c'); rect(x - 1, y - 7 - z, 1, 1, '#fff3a0'); break;
+      case 'goo': circO(x, y - 5, 2, '#7dff9a'); rect(x - 1, y - 6, 1, 1, '#e0ffe8'); break;
       default: circ(x, y - 5, 2, '#fff');
     }
   };
@@ -359,6 +479,9 @@ G.D = (function () {
       case 'star': shadow(x, y + 2, 4); { const s = 3 + Math.sin(t * 8) * 0.8; rect(x - s, y - 6 + b, s * 2 + 1, 1, '#fff3a0'); rect(x, y - 6 - s + b, 1, s * 2 + 1, '#fff3a0'); circ(x, y - 6 + b, 1, '#ffffff'); } break;
       case 'lampshroom': shadow(x, y + 2, 4); ellO(x, y - 2 + b, 2, 3, '#fff0e0'); ellO(x, y - 6 + b, 5, 3, '#9dffb0'); rect(x - 2, y - 7 + b, 1, 1, '#fff'); break;
       case 'pickcrate': shadow(x, y + 2, 6); rect(x - 6, y - 9, 12, 10, '#1a1020'); rect(x - 5, y - 8, 10, 8, '#b8804a'); rect(x - 5, y - 5, 10, 1, '#8a5a3c'); line(x - 3, y - 11, x + 3, y - 5, '#c8d0dc', 1); break;
+      case 'relic': shadow(x, y + 2, 5); rect(x - 5, y - 9 + b, 11, 8, '#1a1020'); rect(x - 4, y - 8 + b, 9, 6, '#ff7aa8'); rect(x, y - 8 + b, 1, 6, '#ffd36b'); rect(x - 4, y - 6 + b, 9, 1, '#ffd36b'); rect(x - 2, y - 11 + b, 2, 2, '#ffd36b'); rect(x + 1, y - 11 + b, 2, 2, '#ffd36b'); break;
+      case 'egg': shadow(x, y + 2, 4); ellO(x, y - 5 + b, 3, 4, '#fff6e8'); rect(x - 1, y - 7 + b, 1, 1, '#ffb3c7'); rect(x + 1, y - 4 + b, 1, 1, '#8fd8ff'); rect(x - 2, y - 3 + b, 1, 1, '#9dffb0'); break;
+      case 'key': shadow(x, y + 2, 4); for (let i = 0; i < 5; i++) { const aa = i * TAU / 5 + t; circ(x + Math.cos(aa) * 2.5, y - 9 + b + Math.sin(aa) * 2.5, 1, '#ffb3c7'); } rect(x, y - 9 + b, 1, 1, '#fff3a0'); rect(x, y - 6 + b, 1, 6, '#ffd36b'); rect(x + 1, y - 2 + b, 2, 1, '#ffd36b'); rect(x + 1, y - 4 + b, 1, 1, '#ffd36b'); break;
       case 'lunch': shadow(x, y + 2, 7); rect(x - 7, y - 4, 14, 6, '#1a1020'); rect(x - 6, y - 3, 12, 4, '#ff7aa8'); rect(x - 6, y - 3, 12, 1, '#ffd0e0'); rect(x - 4, y - 6, 3, 2, '#fff'); rect(x + 1, y - 6, 3, 2, '#ffd36b'); break;
     }
   };
@@ -393,6 +516,46 @@ G.D = (function () {
         rect(x - 8, y - 9, 16, 12, '#1a1020'); rect(x - 7, y - 8, 14, 10, '#b8804a'); rect(x - 7, y - 4, 14, 2, '#ffd36b');
         if (!opened) { rect(x - 7, y - 11, 14, 4, '#1a1020'); rect(x - 6, y - 10, 12, 3, '#c9955a'); rect(x - 1, y - 6, 2, 3, '#fff3a0'); if (Math.floor(t * 3) % 2) rect(x + 5, y - 12, 1, 1, '#fff'); }
         else { rect(x - 7, y - 15, 14, 5, '#1a1020'); rect(x - 6, y - 14, 12, 3, '#8a5a3c'); rect(x - 5, y - 8, 10, 2, '#fff3a0'); }
+        if (!opened && o[5]) {
+          // 잠긴 협동 상자
+          rect(x - 2, y - 9, 5, 5, '#1a1020'); rect(x - 1, y - 8, 3, 3, '#b8b8d0'); rect(x, y - 7, 1, 1, '#1a1020');
+          ctx.strokeStyle = '#b8b8d0'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 0.5, y - 9, 2, Math.PI, 0); ctx.stroke();
+          ctx.globalAlpha = 0.5 + Math.sin(t * 4) * 0.3; rect(x - 9, y - 13, 1, 1, '#ffb3c7'); rect(x + 8, y - 12, 1, 1, '#ffb3c7'); ctx.globalAlpha = 1;
+        }
+        break;
+      }
+      case 'plate': {
+        const col = o[4] === 2 ? '#ffd36b' : o[4] === 1 ? '#9dffb0' : '#8fd8ff';
+        const dn = o[4] ? 0 : 1;
+        ell(x, y + 1, 10, 4, '#1a1020'); ell(x, y - dn, 9, 3, '#5a5a78'); ell(x, y - dn, 6, 2, col);
+        if (o[4] === 0) { const bb = Math.round(Math.sin(t * 5) * 1.5); rect(x, y - 14 + bb, 1, 4, col); rect(x - 1, y - 11 + bb, 3, 1, col); rect(x, y - 10 + bb, 1, 1, col); }
+        break;
+      }
+      case 'bell': {
+        shadow(x, y + 3, 7);
+        rect(x - 7, y - 25, 15, 2, '#6b4a30'); rect(x - 7, y - 25, 1, 28, '#6b4a30'); rect(x + 7, y - 25, 1, 28, '#6b4a30');
+        const sw = o[5] ? Math.round(Math.sin(t * 25) * 2) : 0;
+        rect(x - 2 + sw, y - 22, 5, 2, '#ffd36b'); rect(x - 4 + sw, y - 20, 9, 6, '#ffd36b'); rect(x - 5 + sw, y - 14, 11, 2, '#e0a830');
+        rect(x + sw, y - 12, 1, 2, '#8a6a2a'); rect(x - 2 + sw, y - 19, 1, 3, '#fff3a0');
+        if (o[4] === 2) for (let i = 0; i < 3; i++) { const aa = t * 2 + i * 2.1; rect(x + Math.cos(aa) * 10, y - 18 + Math.sin(aa) * 6, 1, 1, '#fff3a0'); }
+        else if (o[5]) { ctx.globalAlpha = 0.6; ctx.strokeStyle = '#ffd36b'; ctx.beginPath(); ctx.arc(x, y - 17, 12 + ((t * 30) % 8), 0, TAU); ctx.stroke(); ctx.globalAlpha = 1; }
+        break;
+      }
+      case 'cart': {
+        shadow(x, y + 3, 10);
+        rect(x - 10, y - 11, 20, 10, '#1a1020'); rect(x - 9, y - 10, 18, 8, '#8a6b5a'); rect(x - 9, y - 10, 18, 1, '#b89a80'); rect(x - 9, y - 6, 18, 1, '#6b4a3a');
+        if (o[4] === 0) { rect(x - 6, y - 13, 4, 3, '#ffd36b'); rect(x - 1, y - 14, 4, 4, '#ff7aa8'); rect(x + 4, y - 13, 3, 3, '#8fd8ff'); }
+        circO(x - 6, y - 1, 2, '#3a3450'); circO(x + 6, y - 1, 2, '#3a3450');
+        if (o[4] === 1) for (let i = 0; i < 3; i++) rect(x - 16 - i * 5 - ((t * 60) % 5), y - 8 + i * 3, 4, 1, '#ffffff');
+        if (o[4] === 0) { const bb = Math.sin(t * 4) * 1.5; rect(x, y - 26 + bb, 1, 5, '#fff'); rect(x, y - 19 + bb, 1, 1, '#fff'); }
+        break;
+      }
+      case 'camp': {
+        shadow(x, y + 3, 10);
+        circ(x - 8, y, 2, '#8d8aa8'); circ(x + 8, y, 2, '#8d8aa8'); circ(x - 5, y + 2, 2, '#6b6a88'); circ(x + 5, y + 2, 2, '#6b6a88');
+        rect(x - 7, y - 1, 14, 2, '#6b4a30'); rect(x - 5, y - 2, 10, 1, '#8a5a3c');
+        if (o[4] === 0) for (let i = 0; i < 3; i++) { const fh = 6 + Math.sin(t * 12 + i * 2) * 2; rect(x - 4 + i * 3, y - 2 - fh, 3, fh, '#ff7a2e'); rect(x - 3 + i * 3, y - fh, 1, fh - 2, '#ffe0a0'); }
+        else if (Math.floor(t * 3) % 2) rect(x, y - 3, 1, 1, '#ff7a2e');
         break;
       }
       case 'shop': {
@@ -460,6 +623,7 @@ G.D = (function () {
       case 'lavapool': ell(x, y, r, r * 0.55, '#c0401a'); ell(x, y, r * 0.7, r * 0.35, '#ff7a2e'); if (Math.sin(t * 5 + h[0]) > 0.7) rect(x, y - 1, 2, 2, '#ffe0a0'); break;
       case 'spore': ctx.globalAlpha *= 0.55; circ(x, y - 3, r, '#ffb3c7'); ctx.globalAlpha = 1; break;
       case 'dark': ctx.globalAlpha *= 0.7; circ(x, y - 2, r, '#120a24'); break;
+      case 'honey': ell(x, y, r, r * 0.5, '#d89018'); ell(x - 1, y - 1, r * 0.65, r * 0.3, '#ffc83c'); if (Math.sin(t * 3 + h[0]) > 0.8) rect(x + 2, y - 1, 1, 1, '#fff3a0'); break;
     }
     ctx.globalAlpha = 1;
   };
@@ -577,6 +741,66 @@ G.D = (function () {
     if (Math.floor(t * 2) % 2) { rect(x - f * 6, fy - 26, 1, 3, '#d7a8ff'); rect(x - f * 8, fy - 25, 5, 1, '#d7a8ff'); }
   };
 
+  BOSS.yeti = (x, y, b, t) => {
+    const f = Math.cos(b.a || 0) >= 0 ? 1 : -1, br = Math.sin(t * 3);
+    shadow(x, y + 4, 22);
+    ellO(x - 9, y + 1, 5, 2, '#c8dcf0'); ellO(x + 9, y + 1, 5, 2, '#c8dcf0');
+    ellO(x, y - 16, 20, 17 + br * 0.5, '#f0f8ff');
+    for (let i = 0; i < 6; i++) circ(x - 15 + i * 6, y - 31 + (i % 2) * 2 + br * 0.5, 3, '#ffffff');
+    ellO(x - f * 20, y - 12 + br, 5, 8, '#e0f0ff'); ellO(x + f * 20, y - 12 - br, 5, 8, '#e0f0ff');
+    ell(x + f * 4, y - 20, 10, 7, '#8fb8d8');
+    rect(x + f * 1, y - 23, 2, 2, '#1a1020'); rect(x + f * 8, y - 23, 2, 2, '#1a1020');
+    if (b.s === 'breath') { rect(x + f * 3 - 2, y - 18, 6, 3, '#1a3050'); for (let i = 0; i < 3; i++) rect(x + f * (12 + i * 4), y - 17 + Math.sin(t * 20 + i) * 2, 2, 1, '#bfefff'); }
+    else rect(x + f * 3 - 2, y - 17, 5, 1, '#3a5a7a');
+    rect(x + f * 1 - 1, y - 18, 2, 1, '#ff9eb5'); rect(x + f * 9 - 1, y - 18, 2, 1, '#ff9eb5');
+    rect(x - 14, y - 9, 28, 3, '#ff5c7a'); rect(x - f * 9, y - 9, 3, 8, '#ff5c7a');
+    if (b.ph > 1) { rect(x - 6, y - 38, 2, 4, '#bfefff'); rect(x, y - 40, 2, 6, '#bfefff'); rect(x + 6, y - 38, 2, 4, '#bfefff'); }
+    if (b.s === 'tired') for (let i = 0; i < 3; i++) { const aa = t * 5 + i * 2.1; rect(x + Math.cos(aa) * 10, y - 36 + Math.sin(aa) * 3, 1, 1, '#ffe36b'); }
+  };
+  BOSS.queenbee = (x, y, b, t) => {
+    const f = Math.cos(b.a || 0) >= 0 ? 1 : -1, fy = y - 22 + Math.sin(t * 4) * 3, w = Math.sin(t * 40) > 0;
+    shadow(x, y + 4, 16);
+    ctx.globalAlpha = 0.6; ell(x - 9, fy - 13 - (w ? 3 : 0), 9, 6, '#ffffff'); ell(x + 9, fy - 13 - (w ? 3 : 0), 9, 6, '#ffffff'); ctx.globalAlpha = 1;
+    ellO(x - f * 10, fy + 2, 11, 9, '#ffd24a');
+    rect(x - f * 10 - 8, fy, 16, 2, '#3a2a20'); rect(x - f * 10 - 7, fy + 4, 14, 2, '#3a2a20');
+    rect(x - f * 22 - (f > 0 ? 0 : -1), fy + 2, 3, 1, '#1a1020');
+    circO(x + f * 2, fy - 4, 7, '#3a2a20');
+    circO(x + f * 11, fy - 8, 7, '#ffd24a');
+    rect(x + f * 13, fy - 10, 2, 3, b.ph > 1 ? '#ff4d6d' : '#1a1020'); rect(x + f * 8, fy - 10, 2, 3, b.ph > 1 ? '#ff4d6d' : '#1a1020');
+    rect(x + f * 9, fy - 5, 2, 1, '#ff7aa8'); rect(x + f * 14, fy - 5, 2, 1, '#ff7aa8');
+    const cx = x + f * 11;
+    rect(cx - 4, fy - 17, 9, 3, '#ffd24a'); rect(cx - 4, fy - 19, 1, 2, '#ffd24a'); rect(cx, fy - 20, 1, 3, '#ff5c7a'); rect(cx + 4, fy - 19, 1, 2, '#ffd24a');
+    line(cx - 3, fy - 14, cx - 6, fy - 20, '#3a2a20'); line(cx + 3, fy - 14, cx + 6, fy - 20, '#3a2a20');
+    if (b.s === 'tired') for (let i = 0; i < 3; i++) { const aa = t * 5 + i * 2.1; rect(cx + Math.cos(aa) * 8, fy - 24 + Math.sin(aa) * 3, 1, 1, '#ffe36b'); }
+  };
+
+  // ───────────── 펫
+  D.pet = function (pt, t) {
+    const x = Math.round(sx(pt[3])), y = Math.round(sy(pt[4])), sp = pt[1], st = pt[2], f = pt[5] >= 0 ? 1 : -1;
+    if (x < -20 || y < -30 || x > G.C.W + 20 || y > G.C.H + 20) return;
+    const c = G.PETS[sp].col, bob = Math.round(Math.sin(t * 6 + pt[0] * 2));
+    let top = y - 8;
+    switch (sp) {
+      case 'chick': shadow(x, y + 2, 3 + st); circO(x, y - 3 + bob, 3 + st, c[0]); rect(x + f * (3 + st), y - 4 + bob, 2, 1, c[1]); rect(x + f, y - 5 + bob, 1, 1, '#1a1020'); if (st >= 1) rect(x - 1, y - 7 - st + bob, 2, 2, '#ff5c5c'); top = y - 9 - st; break;
+      case 'slime': shadow(x, y + 2, 4 + st); ellO(x, y - 2, 4 + st, 3 + st, c[0]); rect(x - 1, y - 3, 1, 1, '#1a1020'); rect(x + 2, y - 3, 1, 1, '#1a1020'); rect(x - 2 - st, y - 4 - st, 1, 1, '#ffffff'); top = y - 7 - st * 2; break;
+      case 'firefly': { const fy = y - 10 + Math.round(Math.sin(t * 3 + pt[0]) * 3); circ(x, fy, 2 + st, c[1]); rect(x, fy, 1, 1, '#ffffff'); ctx.globalAlpha = 0.5; rect(x - 3 - st, fy - 2, 2, 1, '#ffffff'); rect(x + 2 + st, fy - 2, 2, 1, '#ffffff'); ctx.globalAlpha = 1; top = fy - 4 - st; break; }
+      case 'batpet': { const fy = y - 9 + Math.round(Math.sin(t * 6) * 2), w = Math.sin(t * 20) > 0; rect(x - 5 - st, fy + (w ? -2 : 0), 4 + st, 2, c[0]); rect(x + 2, fy + (w ? -2 : 0), 4 + st, 2, c[0]); circO(x, fy, 2 + (st >> 1), c[0]); rect(x - 1, fy - 1, 1, 1, c[1]); rect(x + 1, fy - 1, 1, 1, c[1]); top = fy - 5; break; }
+      case 'hammy': shadow(x, y + 2, 4 + st); ellO(x, y - 3, 4 + st * 0.5, 3 + st * 0.5, c[0]); ell(x + f, y - 2, 2, 1, c[1]); rect(x + f * 2, y - 4, 1, 1, '#1a1020'); rect(x - 2, y - 7 - st, 1, 1, c[0]); rect(x + 2, y - 7 - st, 1, 1, c[0]); top = y - 9 - st; break;
+    }
+    if (st >= 2) { rect(x - 1, top - 2, 3, 1, '#ffd24a'); rect(x - 1, top - 3, 1, 1, '#ffd24a'); rect(x + 1, top - 3, 1, 1, '#ffd24a'); }
+    rect(x, top + 1 - 5, 1, 1, G.COLORS.p[pt[0]]);
+  };
+
+  // ───────────── 굴집 연못
+  D.pond = function (x, y, t) {
+    x = Math.round(sx(x)); y = Math.round(sy(y));
+    ell(x, y + 1, 44, 17, '#5a3d30'); ell(x, y, 42, 15, '#23406e'); ell(x, y - 1, 38, 12, '#3a6aa8');
+    for (let i = 0; i < 5; i++) { const k = (t * 0.3 + i / 5) % 1; rect(x - 30 + i * 13 + Math.sin(t + i) * 3, y - 6 + (i % 3) * 4, 4, 1, 'rgba(200,230,255,' + (0.6 * (1 - k)).toFixed(2) + ')'); }
+    ell(x - 24, y + 4, 4, 2, '#5cb85c'); ell(x + 26, y - 4, 4, 2, '#5cb85c'); rect(x + 26, y - 6, 1, 1, '#ffb3c7');
+    const fx2 = x + Math.cos(t * 0.7) * 20, fy2 = y + Math.sin(t * 1.1) * 5;
+    ctx.globalAlpha = 0.45; ell(fx2, fy2, 3, 1, '#1a2a4a'); ctx.globalAlpha = 1;
+  };
+
   // ───────────── 굴집 시설 스프라이트
   D.station = function (k, x, y, t, near) {
     x = Math.round(sx(x)); y = Math.round(sy(y));
@@ -611,6 +835,35 @@ G.D = (function () {
         rect(x - 9, y - 26, 18, 29, '#120c1e');
         for (let i = 0; i < 6; i++) { const yy = y - 24 + ((t * 14 + i * 5) % 26); rect(x - 7 + (i * 5) % 14, yy, 1, 1, '#d7a8ff'); }
         rect(x - 3, y - 35, 7, 5, '#1a1020'); rect(x - 2, y - 34, 5, 3, '#ffd36b'); break;
+      case 'gacha':
+        shadow(x, y + 3, 10);
+        rect(x - 9, y - 12, 18, 15, '#1a1020'); rect(x - 8, y - 11, 16, 13, '#ff5c7a'); rect(x - 8, y - 11, 16, 2, '#ff9eb5');
+        rect(x - 3, y - 6, 6, 4, '#3a2030'); rect(x + 5, y - 7, 2, 4, '#ffd36b');
+        circ(x, y - 19, 8, '#1a1020'); circ(x, y - 19, 7, '#cfe9ff');
+        for (let i = 0; i < 5; i++) circ(x - 4 + (i % 3) * 4, y - 17 - Math.floor(i / 3) * 4, 2, ['#ffd36b', '#7dff9a', '#6fb6ff', '#ff7aa8', '#d7a8ff'][i]);
+        rect(x - 4, y - 24, 2, 2, '#ffffff');
+        break;
+      case 'nest':
+        shadow(x, y + 3, 12);
+        ell(x, y - 2, 12, 5, '#8a6a2a'); ell(x, y - 3, 10, 3, '#c9a14a');
+        for (let i = 0; i < 6; i++) rect(x - 11 + i * 4, y - 4 + (i % 2), 3, 1, '#e0c070');
+        { const m = G.App.meta || {}, n = Math.min(3, (m.eggs || []).length); for (let i = 0; i < n; i++) { const wob = Math.sin(t * 8 + i) > 0.9 ? 1 : 0; ellO(x - 4 + i * 4 + wob, y - 6, 2, 3, '#fff6e8'); } }
+        break;
+      case 'pond':
+        shadow(x, y + 3, 6);
+        rect(x - 1, y - 16, 1, 18, '#8a5a3c'); line(x, y - 16, x + 9, y - 22, '#8a5a3c');
+        line(x + 9, y - 22, x + 11, y - 4 + Math.sin(t * 3), 'rgba(255,255,255,0.6)');
+        rect(x + 10, y - 4 + Math.round(Math.sin(t * 3)), 3, 2, '#ff5c7a');
+        rect(x - 6, y - 2, 6, 4, '#6b4a30'); rect(x - 5, y - 3, 4, 1, '#8fd8ff');
+        break;
+      case 'duel':
+        shadow(x, y + 3, 11);
+        rect(x - 1, y - 14, 2, 17, '#6b4a30');
+        rect(x - 12, y - 22, 24, 11, '#1a1020'); rect(x - 11, y - 21, 22, 9, '#c9955a');
+        line(x - 7, y - 19, x - 1, y - 14, '#c8d0dc', 1); line(x + 7, y - 19, x + 1, y - 14, '#c8d0dc', 1);
+        rect(x - 8, y - 20, 3, 1, '#c8d0dc'); rect(x + 6, y - 20, 3, 1, '#c8d0dc');
+        rect(x - 1, y - 20, 2, 2, Math.floor(t * 3) % 2 ? '#ff7aa8' : '#6fb6ff');
+        break;
       case 'deco':
         shadow(x, y + 3, 10); rect(x - 10, y - 14, 20, 17, '#1a1020'); rect(x - 9, y - 13, 18, 15, '#ffb3c7'); rect(x - 7, y - 11, 14, 4, '#fff'); rect(x - 5, y - 5, 10, 5, '#ff7aa8'); break;
     }
@@ -637,6 +890,15 @@ G.D = (function () {
         circ(x + 7, y - 14, 3, '#fff3c0'); rect(x, y - 19, 1, 18, '#8a5a3c'); rect(x - 13, y - 10, 26, 1, '#8a5a3c'); break;
       case 'piano': shadow(x, y + 3, 12); rect(x - 12, y - 14, 24, 17, '#1a1020'); rect(x - 11, y - 13, 22, 15, '#ff7aa8'); rect(x - 10, y - 6, 20, 4, '#fff');
         for (let i = 0; i < 5; i++) rect(x - 8 + i * 4, y - 6, 1, 2, '#1a1020'); break;
+      case 'arcade': shadow(x, y + 3, 9); rect(x - 8, y - 24, 16, 27, '#1a1020'); rect(x - 7, y - 23, 14, 25, '#6f5cff'); rect(x - 5, y - 20, 10, 8, '#0a0a1a');
+        rect(x - 4 + (Math.floor(t * 4) % 6), y - 16, 2, 2, '#7dff9a'); rect(x - 3, y - 19, 1, 1, '#ff5c7a'); rect(x - 5, y - 9, 10, 3, '#3a2a5a'); rect(x - 3, y - 11, 1, 2, '#ff5c7a'); circ(x + 3, y - 8, 1, '#ffd36b'); break;
+      case 'teddy': shadow(x, y + 3, 9); circO(x, y - 6, 7, '#b8804a'); circO(x, y - 16, 5, '#b8804a'); circO(x - 4, y - 21, 2, '#b8804a'); circO(x + 4, y - 21, 2, '#b8804a');
+        ell(x, y - 14, 2, 1, '#e8c39e'); rect(x - 2, y - 17, 1, 1, '#1a1020'); rect(x + 2, y - 17, 1, 1, '#1a1020'); rect(x - 3, y - 11, 7, 2, '#ff5c7a'); ell(x, y - 5, 4, 3, '#e8c39e'); break;
+      case 'mushlamp': shadow(x, y + 3, 6); rect(x - 1, y - 12, 3, 15, '#fff0e0'); ellO(x, y - 14, 8, 5, '#ff6b8a'); rect(x - 4, y - 16, 2, 2, '#ffffff'); rect(x + 3, y - 15, 1, 1, '#ffffff');
+        ctx.globalAlpha = 0.25 + Math.sin(t * 2) * 0.08; circ(x, y - 10, 12, '#ffb3c7'); ctx.globalAlpha = 1; break;
+      case 'mobile': rect(x, y, 1, 6, '#8a6a4a'); rect(x - 14, y + 6, 29, 1, '#8a6a4a');
+        for (let i = 0; i < 3; i++) { const mx = x - 13 + i * 13, my = y + 12 + Math.sin(t * 2 + i) * 2; rect(mx, y + 7, 1, my - y - 8, '#8a6a4a'); if (i === 1) { circ(mx, my, 3, '#fff3c0'); rect(mx + 1, my - 2, 2, 2, '#1a1640'); } else { rect(mx - 2, my, 5, 1, '#ffd36b'); rect(mx, my - 2, 1, 5, '#ffd36b'); } }
+        break;
       case 'lights': for (let i = 0; i < 12; i++) { const lx = x - 88 + i * 16, ly = y + Math.sin(i * 0.9) * 3; rect(lx, ly - 1, 16, 1, '#3a2a30'); circ(lx, ly + 2, 1, ['#ffd36b', '#ff7aa8', '#8fd8ff', '#7dff9a'][i % 4]); } break;
     }
   };

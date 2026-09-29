@@ -45,7 +45,7 @@ G.HUD = (function () {
     // 층
     const b = G.BIOMES[Math.max(0, v.bi)];
     const fi = ((v.fl - 1) % 3) + 1;
-    UI.text(v.fl > 12 ? `깊은 곳 ${v.fl}층` : `${b.name} ${Math.ceil(v.fl / 3)}-${fi}`, cx, y + 2.5, { size: 6.5, align: 'center', color: '#e8dcff' });
+    UI.text(v.fl > 12 ? `${b.name} ${v.fl}층` : `${b.name} ${Math.ceil(v.fl / 3)}-${fi}`, cx, y + 2.5, { size: 6.5, align: 'center', color: '#e8dcff' });
     // 두근 게이지
     const k = v.hg / C.HEART_MAX, full = k >= 1;
     const hx = cx - 7, hy = y + 11, s = 2;
@@ -188,6 +188,46 @@ G.HUD = (function () {
     UI.text('💡 ' + v.hint, C.W / 2, y + 3.5, { size: 7, align: 'center' });
   }
 
+  const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  H.clock = clock;
+  // 왼쪽 위 상태 표시: 보스 러시 시간, 특별한 층, 갈림길, 저주, 이번 주 도전
+  function statusTags(v, t) {
+    const tags = [];
+    if (v.rush) tags.push(['⏱ ' + clock(v.t), '#ffd36b']);
+    if (v.fm) { const f = G.FLOOR_MODS[v.fm]; tags.push([f.icon + ' ' + f.name, '#fff3a0']); }
+    if (v.pn) { const p = G.PATHS[v.pn]; tags.push([p.icon + ' ' + p.name, '#e8dcff']); }
+    if (v.heat) tags.push(['🌙 저주 ' + v.heat + '단계', '#d7a8ff']);
+    if (v.wk) { const w = G.WEEKLY.find(x => x.id === v.wk); if (w) tags.push([w.icon + ' ' + w.name, '#9dffb0']); }
+    if (v.key) tags.push(['🌸 꽃잎 열쇠', '#ffb3c7']);
+    if (v.eg) tags.push(['🥚 ×' + v.eg, '#fff3e0']);
+    tags.forEach(([s, c], i) => UI.text(s, 6, 41 + i * 10, { size: 6.5, color: c }));
+  }
+  // 신호 표시 (화면 밖이면 가장자리 화살표)
+  function pings(v, t) {
+    if (!v.pg) return;
+    const ctx = UI.ctx;
+    for (const [slot, wx, wy, help, age] of v.pg) {
+      const x = R.sx(wx), y = R.sy(wy);
+      const col = help ? '#ff5c7a' : PC[slot], icon = help ? '🆘' : '📍';
+      const a = age > 3.4 ? Math.max(0, (4 - age) / 0.6) : 1;
+      ctx.save(); ctx.globalAlpha = a;
+      if (x < 8 || y < 30 || x > C.W - 8 || y > C.H - 8) {
+        const ang = Math.atan2(y - C.H / 2, x - C.W / 2);
+        const ex = G.U.clamp(x, 14, C.W - 14), ey = G.U.clamp(y, 34, C.H - 16);
+        ctx.translate(ex, ey); ctx.rotate(ang);
+        ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(-3, -4); ctx.lineTo(-3, 4); ctx.closePath(); ctx.fill();
+        ctx.setTransform(1, 0, 0, 1, 0, 0); R.uiBegin(); ctx.globalAlpha = a;
+        UI.emoji(icon, ex - Math.cos(ang) * 11, ey - Math.sin(ang) * 11, 9);
+      } else {
+        const bob = Math.abs(Math.sin(t * 6)) * 3;
+        ctx.strokeStyle = col; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(x, y, 5 + (age * 12) % 10, (5 + (age * 12) % 10) * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
+        UI.emoji(icon, x, y - 22 - bob, 11);
+      }
+      ctx.restore();
+    }
+  }
+
   H.minimap = false;
   function minimap(v, t) {
     if (!H.minimap || !R.map) return;
@@ -198,13 +238,13 @@ G.HUD = (function () {
     for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) {
       if (!e[j * m.w + i]) continue;
       const tt = m.tiles[j * m.w + i];
-      ctx.fillStyle = G.isSolidTile(tt) ? (tt === 3 || tt === 4 || tt === 5 ? '#ffd36b' : 'rgba(150,130,190,0.55)') : tt === 7 ? '#ff7a2e' : 'rgba(60,50,90,0.8)';
+      ctx.fillStyle = G.isSolidTile(tt) ? (tt === 3 || tt === 4 || tt === 5 ? '#ffd36b' : 'rgba(150,130,190,0.55)') : tt === 7 ? '#ff7a2e' : tt === 9 ? '#8ec8e8' : 'rgba(60,50,90,0.8)';
       ctx.fillRect(x + i * s, y + j * s, s, s);
     }
     for (const o of v.ob || []) {
       const tx = Math.floor(o[2] / 16), ty = Math.floor(o[3] / 16);
       if (!e[ty * m.w + tx] && !(v.tm && o[1] === 'chest')) continue;
-      const c = { door: '#fff3a0', chest: '#ffd36b', shop: '#7dff9a', fountain: '#8fd8ff', event: '#ffffff', altar: '#ff5c7a' }[o[1]];
+      const c = { door: '#fff3a0', chest: '#ffd36b', shop: '#7dff9a', fountain: '#8fd8ff', event: '#ffffff', altar: '#ff5c7a', bell: '#ffd36b', plate: '#9dffb0', cart: '#c9955a', camp: '#ff9a3c' }[o[1]];
       if (c) { ctx.fillStyle = c; ctx.fillRect(x + tx * s - 1, y + ty * s - 1, 3, 3); }
     }
     v.ps.forEach((p, i) => { ctx.fillStyle = PC[i]; ctx.fillRect(x + (p.x / 16) * s - 1.5, y + (p.y / 16) * s - 1.5, 3, 3); });
@@ -222,7 +262,31 @@ G.HUD = (function () {
     xpBar(v);
     hintBox(v, t);
     minimap(v, t);
-    if (v.ch) UI.text(`⚔️ 도전 ${v.ch}/3`, 8, 42, { size: 7, color: '#ff9eb5' });
+    if (v.ch) UI.text(`⚔️ 도전 ${v.ch}/3`, C.W - 8, 42, { size: 7, color: '#ff9eb5', align: 'right' });
+    statusTags(v, t);
+    if (!v.ui) pings(v, t);
+    if (v.cw) UI.text('🪨 천장이 무너지고 있어요! 출구로!', C.W / 2, C.H - 46, { size: 7.5, align: 'center', color: '#ffb070', alpha: 0.6 + Math.sin(t * 6) * 0.4 });
+    banner(t);
+    flash();
+    toasts();
+    net();
+  };
+
+  H.duel = function (v, t) {
+    floatTexts();
+    if (!v.ui) prompts(v, t);
+    bubbles(v);
+    UI.panel(C.W / 2 - 34, 4, 68, 20, { fill: 'rgba(24,16,38,0.85)' });
+    UI.text(v.cnt ? '준비…' : '⏱ ' + v.dt, C.W / 2, 8, { size: 10, align: 'center', color: !v.cnt && v.dt <= 10 ? '#ff7aa8' : '#fff3e6' });
+    for (let i = 0; i < 2; i++) {
+      const w = 110, x = i ? C.W - w - 4 : 4, p = v.ps[i];
+      UI.panel(x, 4, w, 20, { edge: PC[i], fill: 'rgba(24,16,38,0.85)' });
+      UI.sprite(p.c, i ? x + w - 20 : x + 3, 6, 1, i === 1);
+      UI.text(p.nm, i ? x + w - 24 : x + 23, 6, { size: 6.5, color: PC[i], align: i ? 'right' : 'left' });
+      UI.text('💎 ' + v.score[i], i ? x + w - 24 : x + 23, 14, { size: 7.5, color: G.COLORS.gold, align: i ? 'right' : 'left' });
+    }
+    if (v.cnt) UI.text(String(v.cnt), C.W / 2, C.H / 2 - 30, { size: 40, align: 'center', color: '#fff3a0', ow: 6 });
+    else if (!v.ui && v.dt > 57) UI.text('⛏️ C / . 캐기 · V / / 폭탄 · 상대를 치면 빙글빙글!', C.W / 2, C.H - 14, { size: 7, align: 'center', color: '#e8dcff' });
     banner(t);
     flash();
     toasts();

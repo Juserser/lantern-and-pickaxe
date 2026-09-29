@@ -59,7 +59,13 @@ G.C = {
   FLOOR_HP: 0.16,
 
   // 조명
-  DARKNESS: { moss: 0.9, crystal: 0.86, lava: 0.78, star: 0.94, hub: 0.55 },
+  DARKNESS: { moss: 0.9, crystal: 0.86, lava: 0.78, star: 0.94, ice: 0.8, garden: 0.72, hub: 0.55, duel: 0.35 },
+
+  // 깊은 밤(저주) 보상
+  HEAT_GEM: 0.08,            // 저주 1단계당 광석 +8%
+
+  // 무너지는 동굴
+  COLLAPSE_AT: 75,
 };
 
 G.BIOMES = [
@@ -77,8 +83,21 @@ G.BIOMES = [
     enemies: ['fairy', 'shadow', 'jelly', 'golem'], music: 'star' },
 ];
 
-G.biomeOf = function (floor) {
-  if (floor > 12) return G.BIOMES[(Math.floor((floor - 1) / 3)) % 4];
+G.BIOMES.push(
+  { id: 'ice', name: '얼음 호수 동굴', floors: [13, 14, 15], boss: 'yeti',
+    pal: { floor: ['#2a3a4c', '#30435a', '#263442'], wall: ['#4a6a8a', '#5a7a9a', '#3a5a7a'], wallTop: '#a8d4f0', edge: '#101a24', glow: '#bfefff' },
+    enemies: ['snowman', 'icebat', 'seal', 'shardfly'], music: 'crystal' },
+  { id: 'garden', name: '비밀 꽃밭', floors: [13, 14, 15], boss: 'queenbee',
+    pal: { floor: ['#2f4a2a', '#365530', '#2a4226'], wall: ['#4a6a3a', '#5a7a44', '#3a5a2e'], wallTop: '#8ac86a', edge: '#142010', glow: '#ffb3c7' },
+    enemies: ['bee', 'flowertrap', 'ladybug', 'butterfly'], music: 'moss' },
+);
+
+// 무한 모드(13층~) 지역 순서: 꽃잎 열쇠가 있으면 비밀 꽃밭이 먼저 열려요
+G.biomeOf = function (floor, garden) {
+  if (floor > 12) {
+    const seq = garden ? [5, 4, 0, 1, 2, 3] : [4, 0, 1, 2, 3];
+    return G.BIOMES[seq[Math.floor((floor - 13) / 3) % seq.length]];
+  }
   return G.BIOMES[Math.min(3, Math.floor((floor - 1) / 3))];
 };
 G.isBossFloor = f => f % 3 === 0;
@@ -88,5 +107,5 @@ G.COLORS = {
   pDark: ['#b8406b', '#3a73b8'],
   text: '#fff3e6', muted: '#b7a7cf', gold: '#ffd36b', good: '#7dff9a', bad: '#ff6b6b',
   panel: 'rgba(28,20,44,0.92)', panelEdge: '#4b3d70',
-  rarity: { c: '#e8e2f0', r: '#6fb6ff', l: '#ffd36b', u: '#ff7aa8' },
+  rarity: { c: '#e8e2f0', r: '#6fb6ff', l: '#ffd36b', g: '#b36bff' },
 };

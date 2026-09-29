@@ -15,7 +15,29 @@ G.ENEMIES = {
   fairy:     { name: '별먼지 요정', hp: 20, spd: 50, r: 5, dmg: 1, xp: 3, ai: 'blink', flying: true, shot: 'star', desc: '순간이동하며 별을 뿌려요.', col: ['#f3c6ff', '#fff6a8'] },
   jelly:     { name: '꿈 해파리', hp: 42, spd: 20, r: 8, dmg: 1, xp: 3, ai: 'pulse', flying: true, desc: '둥실둥실. 주기적으로 파동을 내요.', col: ['#b39dff', '#ffd6f5'] },
   mushling:  { name: '아기 버섯', hp: 8, spd: 38, r: 4, dmg: 1, xp: 0, ai: 'chase', col: ['#ff9eb5', '#fff0e0'], noCodex: true },
+  // 특별 몬스터
+  goldmole:  { name: '보물 두더지', hp: 70, spd: 64, r: 6, dmg: 0, xp: 4, ai: 'flee', harmless: true, desc: '광석 가방을 메고 도망쳐요! 둘이 양쪽에서 몰아 잡아요.', col: ['#c9955a', '#ffd36b'] },
+  mimic:     { name: '미믹 상자', hp: 85, spd: 40, r: 8, dmg: 1, xp: 6, ai: 'mimic', desc: '상자인 줄 알았지? 이기면 보물이 두 배!', col: ['#b8804a', '#ff5c7a'] },
+  // 얼음 호수 동굴
+  snowman:   { name: '꼬마 눈사람', hp: 32, spd: 30, r: 7, dmg: 1, xp: 2, ai: 'ranged', shot: 'snow', desc: '눈덩이를 던져요. 맞으면 몸이 느려져요.', col: ['#ffffff', '#ff8a4c'] },
+  icebat:    { name: '서리 박쥐', hp: 15, spd: 78, r: 5, dmg: 1, xp: 2, ai: 'bat', flying: true, chill: true, desc: '차가운 박쥐. 물리면 몸이 느려져요.', col: ['#8fd8ff', '#e0f4ff'] },
+  seal:      { name: '미끌 물범', hp: 44, spd: 40, r: 7, dmg: 1, xp: 3, ai: 'charger', desc: '배로 미끄러지며 돌진해요! 옆으로 피하세요.', col: ['#b8c8d8', '#5a6a7a'] },
+  // 비밀 꽃밭
+  bee:       { name: '꼬마 꿀벌', hp: 12, spd: 84, r: 4, dmg: 1, xp: 1, ai: 'bee', flying: true, desc: '윙윙~ 떼로 몰려다녀요.', col: ['#ffd24a', '#3a2a20'] },
+  flowertrap:{ name: '냠냠 꽃', hp: 48, spd: 0, r: 7, dmg: 1, xp: 3, ai: 'turret', shot: 'petal', heavy: true, desc: '가만히 서서 꽃잎을 쏴요. 가까이 가면 깨물어요!', col: ['#ff5c8a', '#5cb85c'] },
+  ladybug:   { name: '무당벌레', hp: 30, spd: 44, r: 6, dmg: 1, xp: 2, ai: 'hop', desc: '통통 튀어 다녀요.', col: ['#e03a3a', '#1a1020'] },
+  butterfly: { name: '꽃가루 나비', hp: 22, spd: 50, r: 5, dmg: 1, xp: 3, ai: 'blink', flying: true, shot: 'petal', desc: '순간이동하며 꽃가루를 뿌려요.', col: ['#d7a8ff', '#fff3a0'] },
 };
+
+// 정예 접두어
+G.AFFIXES = {
+  fire:  { icon: '🔥', name: '불타는', col: '#ff7a2e', desc: '지나간 자리에 불씨' },
+  ice:   { icon: '🧊', name: '얼어붙은', col: '#8fd8ff', desc: '닿으면 몸이 느려짐' },
+  ghost: { icon: '👻', name: '투명한', col: '#d7a8ff', desc: '빛 밖에서는 잘 안 보임' },
+  swift: { icon: '⚡', name: '재빠른', col: '#ffe36b', desc: '매우 빠름' },
+  tough: { icon: '🛡️', name: '단단한', col: '#c8b8a0', desc: '체력이 많고 밀리지 않음' },
+};
+G.AFFIX_KEYS = Object.keys(G.AFFIXES);
 
 // 보스 기본 정보 (패턴은 game/bosses.js)
 G.BOSSES = {
@@ -23,4 +45,6 @@ G.BOSSES = {
   crab:     { name: '수정 집게 게', hp: 1500, r: 20, title: '수정 동굴의 파수꾼', col: ['#6fb6ff', '#e0f4ff'], desc: '앞은 단단해요. 한 명이 시선을 끌고 한 명이 뒤를 치세요.' },
   moleking: { name: '화난 용암 두더지왕', hp: 2300, r: 20, title: '따끈 용암굴의 왕', col: ['#8d5a44', '#ffb070'], desc: '땅속을 파고 다녀요. 튀어나올 자리를 잘 보세요.' },
   whale:    { name: '어둠 고래', hp: 3400, r: 26, title: '별빛을 삼킨 고래', col: ['#2a2150', '#d7a8ff'], desc: '빛이 사라지면, 둘의 빛줄기만이 길을 밝혀요.' },
+  yeti:     { name: '눈뭉치 대장 설인', hp: 3000, r: 22, title: '얼음 호수 동굴의 주인', col: ['#e8f4ff', '#6fb6ff'], desc: '입김에 닿으면 꽁꽁! 굴러오는 눈덩이는 옆으로 피해요.' },
+  queenbee: { name: '꿀벌 여왕 비비', hp: 3200, r: 20, title: '비밀 꽃밭의 여왕', col: ['#ffd24a', '#ff7aa8'], desc: '꿀 웅덩이를 피하고, 침 돌진 뒤 지쳤을 때 공격해요.' },
 };

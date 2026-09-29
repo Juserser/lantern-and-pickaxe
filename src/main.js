@@ -74,8 +74,14 @@ G.App = (function () {
   };
   App.startRun = function (o) {
     const s = G.Save.data;
-    const run = G.Run.create({ chars: s.char.slice(), names: [s.names[0] || '1P', s.names[1] || '2P'], hats: s.hat.slice(), star: o.star, daily: o.daily });
+    const chars = o.weekly === 'bombfest' ? ['nyang', 'nyang'] : s.char.slice();
+    const hats = s.hat.map((h, i) => (s.penalty === i ? G.PENALTY_HAT : h));
+    const run = G.Run.create({ chars, names: [s.names[0] || '1P', s.names[1] || '2P'], hats, star: o.star, daily: o.daily, weekly: o.weekly, rush: o.rush, curses: o.curses });
     App.scene = { type: 'run', obj: run };
+    R.clearFx();
+  };
+  App.startDuel = function () {
+    App.scene = { type: 'duel', obj: G.Duel.create() };
     R.clearFx();
   };
 
@@ -88,6 +94,7 @@ G.App = (function () {
     const sc = App.scene;
     const inputs = simInputs();
     if (sc.type === 'hub') G.Hub.update(sc.obj, inputs, dt);
+    else if (sc.type === 'duel') { G.Duel.update(sc.obj, inputs, dt); if (sc.obj.finished) App.startHub(); }
     else {
       G.Run.update(sc.obj, inputs, dt);
       if (sc.obj.finished) { App.startHub(); }
@@ -95,7 +102,7 @@ G.App = (function () {
   }
   function sceneView() {
     const sc = App.scene;
-    return sc.type === 'hub' ? G.Hub.view(sc.obj) : G.Run.view(sc.obj);
+    return sc.type === 'hub' ? G.Hub.view(sc.obj) : sc.type === 'duel' ? G.Duel.view(sc.obj) : G.Run.view(sc.obj);
   }
 
   // ───────────── 네트워크 (방장)
@@ -172,12 +179,14 @@ G.App = (function () {
     // 내 캐릭터 예측
     const me = App.mySlot, srv = latest.v.ps[me];
     const map = guestMap;
-    if (srv && map && srv.st === 'n' && !v.ui && latest.v.sc === 'run' || (srv && map && latest.v.sc === 'hub' && !v.ui)) {
-      const pk = G.In.packet(0);
-      const spd = latest.v.sc === 'hub' ? 82 : (srv.sp || G.CHARS[srv.c].spd);
+    if (srv && map && !v.ui && !srv.rd && !srv.ds && ((srv.st === 'n' && latest.v.sc === 'run') || latest.v.sc === 'hub' || (latest.v.sc === 'duel' && !latest.v.cnt))) {
+      const pk = Object.assign({}, G.In.packet(0));
+      if (latest.v.fm === 'reverse') { pk.x = -pk.x; pk.y = -pk.y; }
+      const spd = latest.v.sc === 'hub' ? 82 : latest.v.sc === 'duel' ? 88 : (srv.sp || G.CHARS[srv.c].spd);
       if (!pred || pred.sc !== latest.v.sc || pred.mv !== latest.v.mv) pred = { x: srv.x, y: srv.y, vx: 0, vy: 0, sc: latest.v.sc, mv: latest.v.mv };
       const dt = App.frameDt;
-      pred.vx = U.lerp(pred.vx, pk.x * spd, 0.28); pred.vy = U.lerp(pred.vy, pk.y * spd, 0.28);
+      const grip = G.World.tileAt(map, pred.x, pred.y) === G.T.ICE ? 0.035 : 0.28;
+      pred.vx = U.lerp(pred.vx, pk.x * spd, grip); pred.vy = U.lerp(pred.vy, pk.y * spd, grip);
       G.World.moveSafe(map, pred, pred.vx * dt, pred.vy * dt, C.PLAYER_R);
       const ex = srv.x - pred.x, ey = srv.y - pred.y, err = Math.hypot(ex, ey);
       if (err > 48) { pred.x = srv.x; pred.y = srv.y; }
@@ -209,6 +218,7 @@ G.App = (function () {
     }
     if (v.pk) for (const k of v.pk) {
       if (k[1] === 'xp' || k[1] === 'xpb') L.push({ x: k[2], y: k[3] - 4, r: 12, c: '#d8ff8a', a: 0.3, nof: true });
+      else if (k[1] === 'relic' || k[1] === 'egg' || k[1] === 'key') L.push({ x: k[2], y: k[3] - 4, r: 24, c: k[1] === 'key' ? '#ffb3c7' : '#ffd36b', a: 0.4 });
       else if (k[1] === 'lampshroom' || k[1] === 'star') L.push({ x: k[2], y: k[3] - 4, r: 26, c: k[1] === 'star' ? '#fff3a0' : '#9dffb0', a: 0.4 });
     }
     if (v.ob) for (const o of v.ob) {
@@ -218,14 +228,22 @@ G.App = (function () {
       if (o[1] === 'altar') L.push({ x: o[2], y: o[3] - 12, r: 28, c: '#ff5c7a', a: 0.4 });
       if (o[1] === 'chest' && !o[4]) L.push({ x: o[2], y: o[3] - 6, r: 14, c: '#ffd36b', a: 0.3 });
       if (o[1] === 'dome') L.push({ x: o[2], y: o[3] - 4, r: o[5] * 1.3, c: '#8fd18a', a: 0.25 });
+      if (o[1] === 'camp') L.push({ x: o[2], y: o[3] - 6, r: 70, c: '#ff9a3c', a: 0.5 });
+      if (o[1] === 'cart') L.push({ x: o[2], y: o[3] - 8, r: 34, c: '#ffd36b', a: 0.35 });
+      if (o[1] === 'bell') L.push({ x: o[2], y: o[3] - 14, r: o[5] ? 50 : 24, c: '#ffd36b', a: 0.4 });
+      if (o[1] === 'plate') L.push({ x: o[2], y: o[3], r: o[4] ? 30 : 16, c: o[4] ? '#9dffb0' : '#8fd8ff', a: 0.35 });
+      if (o[1] === 'chest' && o[5]) L.push({ x: o[2], y: o[3] - 6, r: 20, c: '#ffb3c7', a: 0.3 });
     }
     if (v.hz) for (const h of v.hz) if (h[1] === 'fire' || h[1] === 'lavapool') L.push({ x: h[2], y: h[3], r: h[4] * 2.5, c: '#ff7a2e', a: 0.35 });
+    if (v.pr) for (const p of v.pr) if (p[1] === 'rune' || p[1] === 'meteor') L.push({ x: p[2], y: p[3] - 4, r: 28, c: p[1] === 'rune' ? '#d7a8ff' : '#fff3a0', a: 0.4, nof: true });
     if (v.en) for (const e of v.en) {
-      const g = { fairy: '#f3c6ff', jelly: '#d7b8ff', shardfly: '#8fd8ff', emberbat: '#ff8a3c', salamander: '#ff8a3c', slime: '#ff8a4c', slimelet: '#ff8a4c' }[e[1]];
+      const g = { fairy: '#f3c6ff', jelly: '#d7b8ff', shardfly: '#8fd8ff', emberbat: '#ff8a3c', salamander: '#ff8a3c', slime: '#ff8a4c', slimelet: '#ff8a4c',
+        goldmole: '#ffd36b', icebat: '#bfefff', butterfly: '#f3c6ff', flowertrap: '#ffb3c7' }[e[1]];
       if (g) L.push({ x: e[2], y: e[3] - 8, r: 22, c: g, a: 0.3 });
       if (e[1] === 'shadow') L.push({ x: e[2], y: e[3] - 6, r: 8, c: '#ff5c8a', a: 0.3, nof: true });
     }
     if (v.bs && !v.bs.hid) L.push({ x: v.bs.x, y: v.bs.y - 16, r: 40, c: G.BOSSES[v.bs.k].col[1], a: 0.25 });
+    if (v.pt) for (const pt of v.pt) L.push({ x: pt[3], y: pt[4] - 6, r: pt[1] === 'firefly' ? 36 + pt[2] * 10 : 14, c: G.PETS[pt[1]].col[0], a: 0.35 });
     if (v.tb) {
       const [a, b] = v.ps; const n = 5;
       for (let i = 0; i <= n; i++) { const k = i / n; L.push({ x: a.x + (b.x - a.x) * k, y: a.y - 6 + (b.y - a.y) * k, r: v.dm < 1 ? 40 : 20, c: '#ff9eb5', a: 0.25 }); }
@@ -251,6 +269,7 @@ G.App = (function () {
     if (v.sc === 'hub') {
       const fur = (App.meta && App.meta.fur) || [];
       if (fur.includes('rug')) D.furniture('rug', ...G.Hub.FUR_POS.rug, t);
+      D.pond(G.Hub.POND.x, G.Hub.POND.y, t);
     }
     if (v.tb) D.tether(v.ps[0], v.ps[1], t, v.syn || [], v.dm < 1);
     // y정렬 엔티티
@@ -261,6 +280,7 @@ G.App = (function () {
     if (v.ob) for (const o of v.ob) list.push([o[1] === 'dome' ? o[3] + 40 : o[3], () => D.object(o, t)]);
     if (v.pr) for (const p of v.pr) list.push([p[3] + 1, () => D.proj(p, t)]);
     if (v.bs) list.push([v.bs.y, () => D.boss(v.bs, t)]);
+    if (v.pt) for (const pt of v.pt) list.push([pt[4], () => D.pet(pt, t)]);
     if (v.sc === 'hub') {
       for (const s of G.Hub.STATIONS) { const near = v.ps.some(p => p.pr === s.name); list.push([s.y, () => D.station(s.k, s.x, s.y, t, near)]); }
       const fur = (App.meta && App.meta.fur) || [];
@@ -272,7 +292,7 @@ G.App = (function () {
     v.ps.forEach(p => { if (p.ob && p.st === 'n') for (let k = 0; k < p.ob; k++) { const a = p.oa + k * Math.PI * 2 / p.ob; D.prims.rect(R.sx(p.x + Math.cos(a) * 22) - 1, R.sy(p.y - 4 + Math.sin(a) * 15) - 1, 3, 3, '#fff3a0'); } });
     R.drawParts(0);
     // 조명
-    const biome = v.sc === 'hub' ? 'hub' : G.BIOMES[Math.max(0, v.bi)].id;
+    const biome = v.sc === 'hub' ? 'hub' : v.sc === 'duel' ? 'duel' : G.BIOMES[Math.max(0, v.bi)].id;
     let dark = C.DARKNESS[biome];
     if (v.dm < 1) dark = 0.97;
     R.drawLighting(collectLights(v, t), dark, v.sc === 'hub' ? '#1a0f0a' : '#0b0716');
@@ -289,7 +309,7 @@ G.App = (function () {
     UI.begin();
     if (!v) { UI.text('연결 중… 🌙', C.W / 2, C.H / 2, { size: 10, align: 'center' }); return; }
     if (!ok) { UI.text('동굴 지도를 받는 중… 🗺️', C.W / 2, C.H / 2, { size: 10, align: 'center' }); return; }
-    if (v.sc === 'hub') G.HUD.hub(v, time); else G.HUD.run(v, time);
+    if (v.sc === 'hub') G.HUD.hub(v, time); else if (v.sc === 'duel') G.HUD.duel(v, time); else G.HUD.run(v, time);
     G.Menus.draw(v, time);
     if (App.pendingPhoto) takePhoto();
   }

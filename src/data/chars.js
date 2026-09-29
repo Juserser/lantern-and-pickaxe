@@ -52,8 +52,26 @@ G.CHARS = {
     passive: '회복 아이템 효과 +50%',
     unlock: { need: 'runs5', stars: 4, text: '원정 5회' },
   },
+  hoo: {
+    name: '후후', animal: '부엉이', role: '별 마법사', emoji: '🦉', color: '#b89adf',
+    hp: 9, spd: 76, light: 64, lightPower: false, miner: false, held: 'staff',
+    atk: { type: 'rune', dmg: 10, cd: 0.62, radius: 20, delay: 0.32, range: 130 },
+    skill: { type: 'meteor', name: '별똥별 비', cd: 10, dmg: 20, radius: 28, n: 6, icon: '☄️' },
+    desc: '적이 있는 자리에 마법진을 그려 터뜨려요. 뭉친 적에게 강해요.',
+    passive: '마법진 범위 +20%',
+    unlock: { need: 'boss4', stars: 6, text: '어둠 고래 처치' },
+  },
+  pengu: {
+    name: '뽀롱', animal: '펭귄', role: '얼음 미끄럼꾼', emoji: '🐧', color: '#6fb6ff',
+    hp: 11, spd: 78, light: 50, lightPower: false, miner: false, held: 'snow',
+    atk: { type: 'snow', dmg: 7, cd: 0.4, speed: 175, life: 0.85, r: 3 },
+    skill: { type: 'slide', name: '배 미끄럼', cd: 7, dmg: 14, dist: 170, dur: 0.45, freeze: 1.4, icon: '🧊' },
+    desc: '눈덩이로 적을 느리게 하고, 배로 미끄러져 꽁꽁 얼려요.',
+    passive: '눈덩이가 적을 느리게 함',
+    unlock: { need: 'runs10', stars: 5, text: '원정 10회' },
+  },
 };
-G.CHAR_ORDER = ['toto', 'molly', 'nyang', 'kkobuk', 'yeoul', 'dotori'];
+G.CHAR_ORDER = ['toto', 'molly', 'nyang', 'kkobuk', 'yeoul', 'dotori', 'hoo', 'pengu'];
 
 // 합동기 이름 (조합별)
 G.comboName = function (a, b) {
@@ -64,6 +82,9 @@ G.comboName = function (a, b) {
     'molly+yeoul': '별빛 채굴', 'dotori+toto': '달빛 소풍', 'dotori+molly': '광부의 도시락',
     'kkobuk+nyang': '폭탄 거북선', 'nyang+yeoul': '불꽃 반딧불', 'dotori+nyang': '팝콘 폭발',
     'dotori+kkobuk': '든든한 한 끼', 'kkobuk+yeoul': '반짝 등껍질', 'dotori+yeoul': '별빛 피크닉',
+    'hoo+toto': '별자리 대폭발', 'hoo+molly': '운석 채굴', 'hoo+nyang': '마법 불꽃놀이', 'hoo+kkobuk': '마법 요새', 'hoo+yeoul': '별빛 폭풍',
+    'dotori+hoo': '마법 도시락', 'pengu+toto': '오로라', 'molly+pengu': '얼음 광산', 'nyang+pengu': '눈꽃 폭죽', 'kkobuk+pengu': '빙하 요새',
+    'pengu+yeoul': '겨울 반딧불', 'dotori+pengu': '빙수 파티', 'hoo+pengu': '눈꽃 유성우',
   };
   if (a === b) return '쌍둥이 폭발';
   return table[s] || '두근 폭발';

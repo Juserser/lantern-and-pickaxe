@@ -64,9 +64,10 @@
         <tr><td>공격 / 확인</td><td>C 또는 Space</td><td>. 또는 Enter</td></tr>
         <tr><td>스킬 / 취소</td><td>V</td><td>/</td></tr>
         <tr><td>합동기 💞</td><td>B</td><td>,</td></tr>
+        <tr><td>신호 📍</td><td>E (방향키와 같이: 감정표현)</td><td>' 또는 ;</td></tr>
         <tr><td>일시정지</td><td colspan="2">Esc 또는 P</td></tr>
       </table>
-      <p class="hint">온라인에서는 WASD/방향키 아무거나, 공격 C·J·Space, 스킬 V·K, 합동기 B·L.<br>게임패드와 휴대폰 터치도 지원해요.</p>
+      <p class="hint">온라인에서는 WASD/방향키 아무거나, 공격 C·J·Space, 스킬 V·K, 합동기 B·L, 신호 E·Q.<br>게임패드와 휴대폰 터치도 지원해요.</p>
       <button class="btn ghost" id="btn-help-back">← 돌아가기</button>
     </div>
   </div>
@@ -101,6 +102,7 @@
     <button data-b="s" class="tb">✨</button>
     <button data-b="a" class="tb big">⚔️</button>
     <button data-b="p" class="tb tiny">⏸</button>
+    <button data-b="e" class="tb tiny ping">📍</button>
   </div>
 </div>
 
@@ -125,7 +127,9 @@
 <script src="src/game/enemyai.js"></script>
 <script src="src/game/bosses.js"></script>
 <script src="src/game/run.js"></script>
+<script src="src/game/pets.js"></script>
 <script src="src/game/hub.js"></script>
+<script src="src/game/duel.js"></script>
 <script src="src/ui/ui.js"></script>
 <script src="src/ui/hud.js"></script>
 <script src="src/ui/menus.js"></script>

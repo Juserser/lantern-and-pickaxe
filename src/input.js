@@ -7,13 +7,13 @@ G.In = (function () {
   I.enabled = false;
 
   const BIND = {
-    p1: { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], a: ['KeyC', 'Space'], s: ['KeyV'], c: ['KeyB'], p: ['Escape', 'KeyP'] },
-    p2: { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], a: ['Period', 'Enter', 'Numpad1', 'NumpadEnter'], s: ['Slash', 'Numpad2'], c: ['Comma', 'Numpad3'], p: [] },
+    p1: { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], a: ['KeyC', 'Space'], s: ['KeyV'], c: ['KeyB'], p: ['Escape', 'KeyP'], e: ['KeyE', 'KeyQ'] },
+    p2: { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], a: ['Period', 'Enter', 'Numpad1', 'NumpadEnter'], s: ['Slash', 'Numpad2'], c: ['Comma', 'Numpad3'], p: [], e: ['Quote', 'Semicolon', 'Numpad0'] },
     one: { up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
-      a: ['KeyC', 'Space', 'KeyJ', 'Period', 'Enter', 'KeyZ'], s: ['KeyV', 'KeyK', 'Slash', 'KeyX'], c: ['KeyB', 'KeyL', 'Comma'], p: ['Escape', 'KeyP'] },
+      a: ['KeyC', 'Space', 'KeyJ', 'Period', 'Enter', 'KeyZ'], s: ['KeyV', 'KeyK', 'Slash', 'KeyX'], c: ['KeyB', 'KeyL', 'Comma'], p: ['Escape', 'KeyP'], e: ['KeyE', 'KeyQ', 'Semicolon', 'Quote'] },
   };
-  const NAMES = ['a', 's', 'c', 'p', 'up', 'down', 'left', 'right'];
-  function mk() { return { n: [0, 0, 0, 0, 0, 0, 0, 0], padPrev: {}, padRep: 0, tx: 0, ty: 0, tb: 0 }; }
+  const NAMES = ['a', 's', 'c', 'p', 'up', 'down', 'left', 'right', 'e'];
+  function mk() { return { n: [0, 0, 0, 0, 0, 0, 0, 0, 0], padPrev: {}, padRep: 0, tx: 0, ty: 0, tb: 0 }; }
   const ctl = [mk(), mk()];
 
   function bindsFor(i) { return I.mode === 'local' ? (i === 0 ? BIND.p1 : BIND.p2) : BIND.one; }
@@ -22,7 +22,7 @@ G.In = (function () {
     if (!I.enabled) return;
     const tag = document.activeElement && document.activeElement.tagName;
     if (tag === 'INPUT') return;
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash', 'Tab'].includes(e.code)) e.preventDefault();
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash', 'Tab', 'Quote'].includes(e.code)) e.preventDefault();
     G.A.unlock();
     keys.add(e.code);
     const count = I.mode === 'local' ? 2 : 1;
@@ -30,7 +30,7 @@ G.In = (function () {
       const b = bindsFor(i);
       NAMES.forEach((nm, k) => {
         if (b[nm].includes(e.code)) {
-          if (e.repeat && k < 4) return; // 행동키는 반복 무시, 방향키 반복은 메뉴용 허용
+          if (e.repeat && (k < 4 || k === 8)) return; // 행동키는 반복 무시, 방향키 반복은 메뉴용 허용
           ctl[i].n[k]++;
         }
       });
@@ -56,8 +56,8 @@ G.In = (function () {
     if (Math.hypot(x, y) < 0.22) { x = 0; y = 0; }
     const bt = k => p.buttons[k] && p.buttons[k].pressed;
     if (bt(14)) x = -1; if (bt(15)) x = 1; if (bt(12)) y = -1; if (bt(13)) y = 1;
-    const st = { a: bt(0) || bt(7), s: bt(1) || bt(2) || bt(6), c: bt(3) || bt(4) || bt(5), p: bt(9) || bt(8) };
-    ['a', 's', 'c', 'p'].forEach((k, idx) => { if (st[k] && !c.padPrev[k]) c.n[idx]++; c.padPrev[k] = st[k]; });
+    const st = { a: bt(0) || bt(7), s: bt(1) || bt(2) || bt(6), c: bt(3) || bt(4) || bt(5), p: bt(9) || bt(8), e: bt(10) || bt(11) };
+    ['a', 's', 'c', 'p', 'e'].forEach((k, idx) => { if (st[k] && !c.padPrev[k]) c.n[k === 'e' ? 8 : idx]++; c.padPrev[k] = st[k]; });
     // 메뉴 방향 (스틱 에지 + 반복)
     const dir = Math.abs(x) > 0.6 || Math.abs(y) > 0.6 ? (Math.abs(x) > Math.abs(y) ? (x > 0 ? 7 : 6) : (y > 0 ? 5 : 4)) : -1;
     const now = performance.now();
@@ -85,14 +85,14 @@ G.In = (function () {
   const prevN = [null, null];
   I.frame = function (slot, pk) {
     const pn = prevN[slot] || pk.n;
-    const d = k => Math.max(0, (pk.n[k] - pn[k]) | 0);
+    const d = k => Math.max(0, ((pk.n[k] || 0) - (pn[k] || 0)) | 0);
     const f = { x: pk.x, y: pk.y, a: !!(pk.b & 1), s: !!(pk.b & 2), c: !!(pk.b & 4),
-      pa: d(0), ps: d(1), pc: d(2), pp: d(3), pu: d(4), pd: d(5), pl: d(6), pr: d(7) };
+      pa: d(0), ps: d(1), pc: d(2), pp: d(3), pu: d(4), pd: d(5), pl: d(6), pr: d(7), pe: d(8) };
     prevN[slot] = pk.n.slice();
     return f;
   };
   I.resetPrev = function (slot) { prevN[slot] = null; };
-  I.EMPTY = { x: 0, y: 0, b: 0, n: [0, 0, 0, 0, 0, 0, 0, 0] };
+  I.EMPTY = { x: 0, y: 0, b: 0, n: [0, 0, 0, 0, 0, 0, 0, 0, 0] };
 
   // 터치
   I.initTouch = function () {
@@ -123,7 +123,7 @@ G.In = (function () {
     window.addEventListener('touchmove', e => { for (const t of e.changedTouches) if (t.identifier === sid) { move(t); e.preventDefault(); } }, { passive: false });
     const end = e => { for (const t of e.changedTouches) if (t.identifier === sid) { sid = null; c.tx = c.ty = 0; c.tDir = -1; knob.style.transform = ''; } };
     window.addEventListener('touchend', end); window.addEventListener('touchcancel', end);
-    const idx = { a: 0, s: 1, c: 2, p: 3 }, bit = { a: 1, s: 2, c: 4, p: 0 };
+    const idx = { a: 0, s: 1, c: 2, p: 3, e: 8 }, bit = { a: 1, s: 2, c: 4, p: 0, e: 0 };
     document.querySelectorAll('#tbtns .tb').forEach(btn => {
       const k = btn.dataset.b;
       btn.addEventListener('touchstart', e => { G.A.unlock(); c.n[idx[k]]++; c.tb |= bit[k]; btn.classList.add('on'); e.preventDefault(); }, { passive: false });

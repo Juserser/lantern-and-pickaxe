@@ -12,15 +12,19 @@ G.Save = (function () {
       ach: [], starLevel: 0, cleared: false,
       codex: { enemies: {}, cards: {}, relics: {}, bosses: {} },
       tutorial: {},
-      stats: { runs: 0, playTime: 0, kills: 0, ores: 0, gemsTotal: 0, combos: 0, revives: [0, 0], bosses: { mushking: 0, crab: 0, moleking: 0, whale: 0 },
+      pets: [], petOf: [-1, -1], eggs: [], fish: {}, meal: null, curseSel: [], weeklyDone: '', penalty: -1,
+      stats: { runs: 0, playTime: 0, kills: 0, ores: 0, gemsTotal: 0, combos: 0, revives: [0, 0], bosses: { mushking: 0, crab: 0, moleking: 0, whale: 0, yeti: 0, queenbee: 0 },
         handFloors: 0, bestFloor: 0, bestLevel: 0, nohitBoss: 0, telepathy: 0, dailies: 0, bestStar: -1, charsUnlocked: 2, codexFull: false,
-        furnitureCount: 0, deaths: 0, clears: 0, lastDaily: '' },
+        furnitureCount: 0, deaths: 0, clears: 0, lastDaily: '',
+        moles: 0, mimics: 0, puzzles: 0, carts: 0, fish: 0, petsHatched: 0, bestHeat: 0, rushBest: 0, duel: [0, 0], gardenFound: false,
+        weeklies: 0, gambleFloor: 0 },
     };
   };
   function migrate(d) {
     const f = S.fresh();
     for (const k in f) if (d[k] === undefined) d[k] = f[k];
     for (const k in f.stats) if (d.stats[k] === undefined) d.stats[k] = f.stats[k];
+    for (const k in f.stats.bosses) if (d.stats.bosses[k] === undefined) d.stats.bosses[k] = 0;
     for (const k in f.codex) if (!d.codex[k]) d.codex[k] = {};
     d.v = G.C.VERSION;
     return d;

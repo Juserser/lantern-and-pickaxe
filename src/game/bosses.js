@@ -7,7 +7,7 @@ G.Boss = (function () {
 
   B.spawn = function (run, k, x, y) {
     const d = G.BOSSES[k];
-    const hp = Math.round(d.hp * (1 + run.star * C.STAR_HP) * (run.floor > 12 ? 1 + (run.floor - 12) * 0.25 : 1));
+    const hp = Math.round(d.hp * (1 + run.star * C.STAR_HP) * (run.floor > 12 ? 1 + (run.floor - 12) * 0.25 : 1) * (run.curse.bossrage ? 1.4 : 1) * (run.hpMul || 1));
     run.boss = { id: U.id(), boss: true, k, x, y, r: d.r, hp, maxHp: hp, ph: 1, s: 'dormant', stT: 0, a: Math.PI, fa: Math.PI, fl: 0, flash: 0, z: 0,
       hidden: false, vuln: 1, front: k === 'crab', t: 0, vx: 0, vy: 0, kvx: 0, kvy: 0, burn: 0, slowT: 0, frozen: 0, stun: 0, seq: 0, hitsAtStart: 0, def: null, spd: 34 };
     run.bossHits = 0;
@@ -29,9 +29,9 @@ G.Boss = (function () {
   function radial(run, b, n, sp, k, off, dmg, life) {
     for (let i = 0; i < n; i++) { const a = off + i * TAU / n; Cb().proj(run, { k, owner: -1, x: b.x, y: b.y - 8, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg: dmg || 1, life: life || 3, r: 3 }); }
   }
-  function lobRock(run, sx, sy, tx, ty, dmg, after) {
+  function lobRock(run, sx, sy, tx, ty, dmg, after, k) {
     const ft = 0.9 + Math.random() * 0.3;
-    Cb().proj(run, { k: 'rock', owner: -1, x: sx, y: sy, sx, sy, tx, ty, ft, life: ft + 0.1, dmg, rad: 16, lob: true, after });
+    Cb().proj(run, { k: k || 'rock', owner: -1, x: sx, y: sy, sx, sy, tx, ty, ft, life: ft + 0.1, dmg, rad: 16, lob: true, after });
     tel(run, { s: 'c', x: tx, y: ty, a: 16, T: ft });
   }
   const dmgB = run => 1 + (run.floor >= 9 ? 1 : 0);
@@ -54,11 +54,12 @@ G.Boss = (function () {
       return;
     }
     // 2페이즈
-    if (b.ph === 1 && b.hp < b.maxHp * 0.5) {
+    if (b.ph === 1 && b.hp < b.maxHp * (run.curse.bossrage ? 0.65 : 0.5)) {
       b.ph = 2; fx('banner', '화났다!', G.BOSSES[b.k].name + ' 2페이즈'); fx('snd', 'roar'); fx('shake', 6); fx('flash', '#ff7aa8', 0.25);
       if (b.k === 'whale') { next(b, 'dark', 7); startDark(run, b); }
     }
     b.stT -= dt;
+    if (run.curse.bossrage) b.stT -= dt * 0.3;
     B[b.k](run, b, p, dt);
     if (!b.hidden && b.s !== 'jump') G.World.move(run.map, b, b.vx * dt, b.vy * dt, b.r * 0.7);
     // 접촉 피해
@@ -286,6 +287,113 @@ G.Boss = (function () {
     }
   };
 
+  // ── 눈뭉치 대장 설인
+  B.yeti = function (run, b, p, dt) {
+    const ph2 = b.ph > 1;
+    b.a = U.ang(b.x, b.y, p.x, p.y);
+    switch (b.s) {
+      case 'walk':
+        b.vuln = 1; chase(run, b, p, 32 * (ph2 ? 1.3 : 1), dt);
+        if (b.stT <= 0) next(b, U.rng.pick(ph2 ? ['roll', 'breath', 'icicle', 'summon', 'roll'] : ['roll', 'breath', 'icicle']), 1.7);
+        break;
+      case 'roll':
+        b.vx *= 0.8; b.vy *= 0.8;
+        if (b.sub === 0) { b.sub = 1; b.subT = 0.7; b.ra = b.a; tel(run, { s: 'l', x: b.x, y: b.y, a: 260, b: 30, ang: b.ra, T: 0.7 }); fx('snd', 'warn'); fx('say', 'boss', '데굴데굴~!'); }
+        b.subT -= dt;
+        if (b.sub === 1 && b.subT <= 0) {
+          b.sub = 2;
+          const n = ph2 ? 3 : 1;
+          for (let i = 0; i < n; i++) { const a = b.ra + (i - (n - 1) / 2) * 0.45; Cb().proj(run, { k: 'bigsnow', owner: -1, x: b.x + Math.cos(a) * 20, y: b.y + Math.sin(a) * 14, vx: Math.cos(a) * 120, vy: Math.sin(a) * 120, dmg: dmgB(run), life: 3, r: 9, slow: 2 }); }
+          fx('snd', 'slam'); fx('shake', 3);
+        }
+        if (b.stT <= 0) next(b, 'walk', 1.4);
+        break;
+      case 'breath':
+        b.vx *= 0.8; b.vy *= 0.8;
+        if (b.sub === 0) { b.sub = 1; b.subT = 0.8; b.ba = b.a; tel(run, { s: 'a', x: b.x, y: b.y, a: 90, b: 1.3, ang: b.ba, T: 0.8 }); fx('snd', 'warn'); }
+        b.subT -= dt;
+        if (b.sub === 1 && b.subT <= 0) {
+          b.sub = 2; fx('snd', 'wave'); fx('arc', b.x, b.y - 10, 80, b.ba, 1.3, '#bfefff'); fx('arc', b.x, b.y - 10, 50, b.ba, 1.3, '#ffffff');
+          for (const q of run.players) if (Cb().active(q) && U.dist(q.x, q.y, b.x, b.y) < 90 && Math.abs(U.angDiff(b.ba, U.ang(b.x, b.y, q.x, q.y))) < 0.65) { if (Cb().hurt(run, q, dmgB(run), { x: b.x, y: b.y })) q.slowT = 2.5; }
+          if (ph2 && !b.twice) { b.twice = true; b.sub = 0; }
+        }
+        if (b.stT <= 0) { b.twice = false; next(b, 'walk', 1.3); }
+        break;
+      case 'icicle':
+        b.vx *= 0.8; b.vy *= 0.8;
+        if (b.sub === 0) {
+          b.sub = 1; fx('snd', 'roar'); fx('shake', 4);
+          for (const q of run.players) if (Cb().active(q)) for (let i = 0; i < (ph2 ? 5 : 3); i++) {
+            const x = q.x + (Math.random() - 0.5) * 80, y = q.y + (Math.random() - 0.5) * 60, T = 1.0 + i * 0.15;
+            run.delayed.push({ t: T, fn: () => { hurtArea(run, x, y, 15, 1); fx('burst', x, y, 8, '#bfefff', 60, 0.4); fx('snd', 'break'); } });
+            tel(run, { s: 'c', x, y, a: 15, T });
+          }
+        }
+        if (b.stT <= 0) { next(b, 'tired', 1.8); b.vuln = 1.4; }
+        break;
+      case 'tired':
+        b.vx *= 0.8; b.vy *= 0.8;
+        if (Math.random() < 0.05) fx('txt', b.x + 12, b.y - 46, '헥헥', '#bfefff', 7);
+        if (b.stT <= 0) { b.vuln = 1; next(b, 'walk', 1.4); }
+        break;
+      case 'summon':
+        b.vx *= 0.8; b.vy *= 0.8;
+        if (b.sub === 0) { b.sub = 1; fx('say', 'boss', '눈사람 친구들~!'); for (let i = 0; i < 3; i++) { const a = i * TAU / 3; G.Run.spawnEnemy(run, i === 1 ? 'seal' : 'snowman', b.x + Math.cos(a) * 36, b.y + Math.sin(a) * 26, {}); } }
+        if (b.stT <= 0) next(b, 'walk', 1.5);
+        break;
+    }
+  };
+
+  // ── 꿀벌 여왕 비비
+  B.queenbee = function (run, b, p, dt) {
+    const ph2 = b.ph > 1;
+    switch (b.s) {
+      case 'walk': {
+        b.vuln = 1;
+        const a = U.ang(b.x, b.y, p.x, p.y) + Math.sin(b.t * 2) * 0.9, sp = 42 * (ph2 ? 1.3 : 1);
+        b.vx = U.lerp(b.vx, Math.cos(a) * sp, 0.06); b.vy = U.lerp(b.vy, Math.sin(a) * sp, 0.06); b.a = U.ang(b.x, b.y, p.x, p.y);
+        if (b.stT <= 0) next(b, U.rng.pick(ph2 ? ['sting', 'honey', 'swarm', 'pollen', 'sting'] : ['sting', 'honey', 'swarm', 'pollen']), 1.6);
+        break;
+      }
+      case 'sting':
+        if (b.sub === 0) { b.sub = 1; b.da = U.ang(b.x, b.y, p.x, p.y); b.a = b.da; b.subT = 0.75; tel(run, { s: 'l', x: b.x, y: b.y, a: 220, b: 24, ang: b.da, T: 0.75 }); fx('snd', 'warn'); b.vx = b.vy = 0; }
+        b.subT -= dt;
+        if (b.sub === 1 && b.subT <= 0) { b.sub = 2; b.subT = 0.6; fx('snd', 'dash'); }
+        if (b.sub === 2) {
+          b.vx = Math.cos(b.da) * 320; b.vy = Math.sin(b.da) * 320;
+          if (b.subT <= 0 || G.World.solidAt(run.map, b.x + Math.cos(b.da) * 24, b.y + Math.sin(b.da) * 24)) {
+            b.vx = b.vy = 0;
+            if (ph2 && !b.twice) { b.twice = true; b.sub = 0; }
+            else { b.twice = false; next(b, 'tired', 2.0); b.vuln = 1.5; fx('txt', b.x, b.y - 40, '어지러워~ 지금이야!', '#ffd36b', 8); }
+          }
+        }
+        break;
+      case 'tired':
+        b.vx *= 0.85; b.vy *= 0.85;
+        if (b.stT <= 0) { b.vuln = 1; next(b, 'walk', 1.4); }
+        break;
+      case 'honey':
+        b.vx *= 0.9; b.vy *= 0.9; b.subT -= dt;
+        if (b.subT <= 0 && b.sub < (ph2 ? 6 : 4)) {
+          b.subT = 0.3; b.sub++;
+          const q = run.players[b.sub % 2], t2 = Cb().active(q) ? q : p;
+          lobRock(run, b.x, b.y - 20, t2.x + (Math.random() - 0.5) * 50, t2.y + (Math.random() - 0.5) * 40, 1, 'honey', 'honeyball');
+        }
+        if (b.stT <= 0) next(b, 'walk', 1.4);
+        break;
+      case 'swarm':
+        b.vx *= 0.9; b.vy *= 0.9;
+        if (b.sub === 0) { b.sub = 1; fx('say', 'boss', '얘들아, 출동!'); const n = ph2 ? 6 : 4; for (let i = 0; i < n; i++) { const a = i * TAU / n; G.Run.spawnEnemy(run, 'bee', b.x + Math.cos(a) * 30, b.y + Math.sin(a) * 22, {}); } }
+        if (b.stT <= 0) next(b, 'walk', 1.8);
+        break;
+      case 'pollen':
+        b.vx *= 0.9; b.vy *= 0.9; b.subT -= dt;
+        if (b.subT <= 0 && b.sub < (ph2 ? 5 : 3)) { b.subT = 0.45; radial(run, b, ph2 ? 14 : 10, 72, 'petal', b.sub * 0.3 + b.t, 1, 3.5); b.sub++; fx('snd', 'spore'); }
+        if (b.stT <= 0) next(b, 'walk', 1.6);
+        break;
+    }
+  };
+
   B.die = function (run, b) {
     if (b.dead) return;
     b.dead = true;
@@ -299,6 +407,7 @@ G.Boss = (function () {
     Cb().drop(run, 'gemb', b.x, b.y, 3, 5);
     Cb().drop(run, 'heart', b.x, b.y, 2, 2);
     Cb().drop(run, 'xpb', b.x, b.y, 8, 3);
+    if (Math.random() < 0.2) Cb().drop(run, 'egg', b.x, b.y, 1, 1);
     run.bossesKilled.push(b.k);
     if (run.bossHits === 0) run.stats.nohitBoss++;
     for (const e of run.enemies) if (!e.dead) Cb().killEnemy(run, e, {});
@@ -311,7 +420,7 @@ G.Boss = (function () {
       G.Run.photo(run, `${U.today()} — ${run.players[0].name}와(과) ${run.players[1].name}, ${d.name}을(를) 재우다 ✨`);
       const ex = run.info.exit;
       run.objects.push({ id: U.id(), k: 'door', x: ex.x, y: ex.y, st: 1, prog: 1 });
-      fx('snd', 'door'); fx('music', G.biomeOf(run.floor).music);
+      fx('snd', 'door'); fx('music', G.biomeOf(run.floor, run.garden).music);
     } });
   };
   return B;

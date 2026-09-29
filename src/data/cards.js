@@ -15,7 +15,7 @@ G.SYNERGY = {
   star: '둘 다 치명타 +10% · 두근 게이지 +30%',
 };
 
-// rarity: c 일반 / r 희귀 / l 전설 / u 커플
+// rarity: c 일반 / r 희귀 / l 전설 / g 도박
 G.CARDS = [
   // ── 일반
   { id: 'claw', name: '반짝 발톱', icon: '🐾', r: 'c', tag: 'star', desc: '공격력 +15%', max: 5, apply: p => { p.st.dmg += 0.15; } },
@@ -56,15 +56,14 @@ G.CARDS = [
   { id: 'worldtree', name: '세계수 잎', icon: '🍃', r: 'l', tag: 'leaf', desc: '최대 체력 +2칸, 재생 +3', max: 1, apply: p => { p.st.maxHp += 4; p.hp += 4; p.st.regen += 3; } },
   { id: 'supernova', name: '초신성', icon: '🌟', r: 'l', tag: 'star', desc: '치명타 +15%, 치명 피해 +80%', max: 1, apply: p => { p.st.crit += 0.15; p.st.critMul += 0.8; } },
   { id: 'dragon', name: '꼬마 용의 숨결', icon: '🐉', r: 'l', tag: 'fire', desc: '공격할 때마다 불꽃탄 추가', max: 1, apply: p => { p.st.dragon = 1; } },
-  // ── 커플 (분홍)
-  { id: 'hands', name: '손깍지', icon: '🤝', r: 'u', tag: 'u', desc: '빛줄기 연결 거리 +35%', max: 2, apply: (p, t) => { t.st.beamRange += 0.35; } },
-  { id: 'share', name: '같이 먹자', icon: '🍡', r: 'u', tag: 'u', desc: '회복 아이템을 먹으면 상대도 회복', max: 1, apply: (p, t) => { t.st.shareHeal = 1; } },
-  { id: 'guard', name: '대신 맞아줄게', icon: '🫂', r: 'u', tag: 'u', desc: '빛줄기 연결 중 받는 피해 30% 감소 (둘 다)', max: 1, apply: (p, t) => { t.st.guard = 1; } },
-  { id: 'missyou', name: '보고 싶었어', icon: '💌', r: 'u', tag: 'u', desc: '떨어졌다 다시 만나면 사랑의 폭발', max: 1, apply: (p, t) => { t.st.reunion = 1; } },
-  { id: 'doki', name: '두근두근', icon: '💓', r: 'u', tag: 'u', desc: '두근 게이지 획득 +50%', max: 2, apply: (p, t) => { t.st.heartGain += 0.5; } },
-  { id: 'hotheart', name: '뜨거운 마음', icon: '❤️‍🔥', r: 'u', tag: 'u', desc: '빛줄기 피해 +60%', max: 3, apply: (p, t) => { t.st.beamDmg += 0.6; } },
-  { id: 'coming', name: '금방 갈게', icon: '🏃', r: 'u', tag: 'u', desc: '부활 속도 +60%, 부활 체력 +1칸', max: 1, apply: (p, t) => { t.st.reviveSpd += 0.6; t.st.reviveHp += 2; } },
-  { id: 'ring', name: '커플 반지', icon: '💍', r: 'u', tag: 'u', desc: '둘이 가진 커플 카드 1장당 공격력 +6%', max: 1, apply: (p, t) => { t.st.ring = 1; } },
+  // ── 도박 (검은 테두리: 이득과 손해가 함께)
+  { id: 'glass', name: '유리 대포', icon: '🔮', r: 'g', tag: 'star', desc: '공격력 +60%, 최대 체력 -2칸', max: 1, apply: p => { p.st.dmg += 0.6; p.st.maxHp = Math.max(2, p.st.maxHp - 4); p.hp = Math.min(p.hp, p.st.maxHp); } },
+  { id: 'greedy', name: '욕심쟁이', icon: '🤑', r: 'g', tag: 'leaf', desc: '광석 2배, 받는 피해 +반 칸', max: 1, apply: (p, t) => { t.st.gemMul += 1; p.st.hurtPlus += 1; } },
+  { id: 'lonewolf', name: '외톨이 늑대', icon: '🐺', r: 'g', tag: 'bolt', desc: '빛줄기가 끊겨 있을 때 공격력 +45%', max: 1, apply: p => { p.st.lone += 0.45; } },
+  { id: 'berserk', name: '광전사', icon: '😤', r: 'g', tag: 'fire', desc: '공격 속도 +40%, 빛 반경 -30%', max: 1, apply: p => { p.st.aspd += 0.4; p.st.light *= 0.7; p.lightR = p.st.light; } },
+  { id: 'dice', name: '운명의 주사위', icon: '🎲', r: 'g', tag: 'star', desc: '치명타 +20%, 치명 피해 +60%, 공격력 -20%', max: 1, apply: p => { p.st.crit += 0.2; p.st.critMul += 0.6; p.st.dmg -= 0.2; } },
+  { id: 'nightowl', name: '올빼미 눈', icon: '🌚', r: 'g', tag: 'ice', desc: '어둠 속에서 공격력 +40%, 빛 반경 -40%', max: 1, apply: p => { p.st.owl += 0.4; p.st.light *= 0.6; p.lightR = p.st.light; } },
+  { id: 'lastcandle', name: '마지막 촛불', icon: '🕯️', r: 'g', tag: 'fire', desc: '체력 1칸 이하일 때 공격력 +80%, 최대 체력 -1칸', max: 1, apply: p => { p.st.lastStand += 0.8; p.st.maxHp = Math.max(2, p.st.maxHp - 2); p.hp = Math.min(p.hp, p.st.maxHp); } },
 ];
 G.CARD = {}; G.CARDS.forEach(c => (G.CARD[c.id] = c));
 

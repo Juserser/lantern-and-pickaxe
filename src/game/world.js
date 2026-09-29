@@ -1,5 +1,5 @@
 // 타일, 동굴 생성, 충돌
-G.T = { FLOOR: 0, ROCK: 1, BEDROCK: 2, ORE: 3, BIGORE: 4, RAINBOW: 5, BOULDER: 6, LAVA: 7, CRYSTAL: 8 };
+G.T = { FLOOR: 0, ROCK: 1, BEDROCK: 2, ORE: 3, BIGORE: 4, RAINBOW: 5, BOULDER: 6, LAVA: 7, CRYSTAL: 8, ICE: 9 };
 G.TILE_HP = { 1: 3, 3: 2, 4: 3, 5: 4, 6: 6, 8: 3 };
 G.isSolidTile = t => t === 1 || t === 2 || t === 3 || t === 4 || t === 5 || t === 6 || t === 8;
 
@@ -201,7 +201,25 @@ G.World = (function () {
     if (rng.chance(0.6)) want.push('event');
     if (floor >= 2 && rng.chance(0.4)) want.push('altar');
     if (!info.chest && rng.chance(0.5)) want.push('chest');
-    for (const k of want) { const p = takeSpot(12); if (p) { if (k === 'chest') info.chest = p; else info.rooms.push(Object.assign({ type: k }, p)); } }
+    if (rng.chance(0.4)) want.push('plates');
+    if (floor >= 2 && rng.chance(0.3)) want.push('bells');
+    const protect = [];
+    for (const k of want) {
+      const p = takeSpot(12); if (!p) continue;
+      if (k === 'chest') { info.chest = p; continue; }
+      const room = Object.assign({ type: k }, p);
+      if (k === 'plates') {
+        // 협동 발판 방: 넓게 파서 두 발판 사이를 벌려요
+        const tx = Math.floor(p.x / S), ty = Math.floor(p.y / S);
+        carve(m, tx, ty, 3); protect.push([tx, ty]);
+      }
+      if (k === 'bells') {
+        // 멀리 떨어진 두 번째 종
+        const q = takeSpot(16); if (!q) continue;
+        room.x2 = q.x; room.y2 = q.y;
+      }
+      info.rooms.push(room);
+    }
 
     // 몬스터 무리
     const packCells = rng.shuffle(floorCells.filter(([x, y]) => dist[y * w + x] >= 13 && !nearExit(x, y, 3)));
@@ -213,14 +231,55 @@ G.World = (function () {
 
     // 바이옴 꾸미기 & 광석
     decorate(m, rng, floor, biome, st, ex);
+    for (const [tx, ty] of protect) for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) {
+      const k = (ty + j) * w + tx + i; if (m.tiles[k] === T.LAVA || m.tiles[k] === T.ICE) m.tiles[k] = T.FLOOR;
+    }
+    // 광차 레일
+    if (floor >= 2 && rng.chance(0.4)) info.cart = rail(m, rng, dist, nearExit, hidden, st);
     m.bi = G.BIOMES.indexOf(biome);
     return { map: m, info };
   };
+
+  function rail(m, rng, dist, nearExit, hidden, st) {
+    const w = m.w, h = m.h;
+    for (let tries = 0; tries < 300; tries++) {
+      const L = rng.int(16, 22);
+      const x0 = rng.int(3, w - L - 4), y = rng.int(3, h - 4);
+      if (m.tiles[y * w + x0] !== T.FLOOR || dist[y * w + x0] < 5) continue;
+      if (Math.abs(x0 - st[0]) + Math.abs(y - st[1]) < 6) continue;
+      let ok = true;
+      for (let x = x0; x <= x0 + L && ok; x++) {
+        if (nearExit(x, y, 5)) ok = false;
+        for (const [hx, hy] of hidden) if (Math.abs(x - hx) <= 3 && Math.abs(y - hy) <= 3) ok = false;
+        if (W.get(m, x, y) === T.BEDROCK) ok = false;
+      }
+      if (!ok) continue;
+      for (let x = x0; x <= x0 + L; x++) {
+        m.tiles[y * w + x] = T.FLOOR;
+        m.deco.push([x * S + 8, y * S + 8, 'rail']);
+        for (const dy of [-1, 1]) {
+          const k = (y + dy) * w + x, t = m.tiles[k];
+          if (t === T.ROCK && rng.chance(0.45)) m.tiles[k] = rng.chance(0.15) ? T.BIGORE : T.ORE;
+        }
+      }
+      return { x0: x0 * S + 8, x1: (x0 + L) * S + 8, y: y * S + 8 };
+    }
+    return null;
+  }
 
   function decorate(m, rng, floor, biome, st, ex) {
     const w = m.w, h = m.h;
     const isF = (x, y) => W.get(m, x, y) === T.FLOOR;
     const nearSE = (x, y, r) => Math.max(Math.abs(x - st[0]), Math.abs(y - st[1])) <= r || Math.max(Math.abs(x - ex[0]), Math.abs(y - ex[1])) <= r;
+    // 얼음 호수 (미끄러운 바닥)
+    if (biome.id === 'ice') {
+      const n = 5 + rng.int(0, 3);
+      for (let k = 0; k < n; k++) {
+        const x = rng.int(3, w - 4), y = rng.int(3, h - 4); if (!isF(x, y) || nearSE(x, y, 4)) continue;
+        const r = rng.range(1.8, 3.4);
+        for (let j = -4; j <= 4; j++) for (let i = -4; i <= 4; i++) if (i * i + j * j <= r * r && isF(x + i, y + j) && !nearSE(x + i, y + j, 3)) m.tiles[(y + j) * w + x + i] = T.ICE;
+      }
+    }
     // 용암 웅덩이
     if (biome.id === 'lava') {
       const n = 6 + rng.int(0, 4);
@@ -238,7 +297,7 @@ G.World = (function () {
         if (r < 0.055) m.tiles[y * w + x] = T.ORE;
         else if (r < 0.068) m.tiles[y * w + x] = T.BIGORE;
         else if (r < 0.071 && floor >= 3) m.tiles[y * w + x] = T.RAINBOW;
-        else if ((biome.id === 'crystal' || biome.id === 'star') && r < 0.1) m.tiles[y * w + x] = T.CRYSTAL;
+        else if ((biome.id === 'crystal' || biome.id === 'star' || biome.id === 'ice') && r < 0.1) m.tiles[y * w + x] = T.CRYSTAL;
       }
       if (t === T.FLOOR) {
         const wallN = !isF(x, y - 1) || !isF(x - 1, y) || !isF(x + 1, y);
@@ -254,6 +313,13 @@ G.World = (function () {
         } else if (biome.id === 'lava') {
           if (r < 0.05) m.deco.push([px, py, 'pb']);
           else if (r < 0.065) m.deco.push([px, py, 'em']);
+        } else if (biome.id === 'ice') {
+          if (wallN && r < 0.04) m.deco.push([px, py, 'cr']);
+          else if (r < 0.07) m.deco.push([px, py, 'sn']);
+        } else if (biome.id === 'garden') {
+          if (wallN && r < 0.04) m.deco.push([px, py, 'gm']);
+          else if (r < 0.1) m.deco.push([px, py, 'fl']);
+          else if (r < 0.16) m.deco.push([px, py, 'gr']);
         } else {
           if (r < 0.035) m.deco.push([px, py, 'st']);
           else if (wallN && r < 0.06) m.deco.push([px, py, 'cr']);
@@ -281,7 +347,7 @@ G.World = (function () {
     for (let k = 0; k < 14; k++) {
       const a = rng() * Math.PI * 2, r = rng.range(0.75, 0.95);
       const x = Math.round(cx + Math.cos(a) * 12.5 * r), y = Math.round(cy + Math.sin(a) * 10.5 * r);
-      if (W.get(m, x, y) === T.FLOOR) m.deco.push([x * S + 8, y * S + 8, biome.id === 'moss' ? 'gm' : biome.id === 'lava' ? 'em' : 'cr']);
+      if (W.get(m, x, y) === T.FLOOR) m.deco.push([x * S + 8, y * S + 8, biome.id === 'moss' || biome.id === 'garden' ? 'gm' : biome.id === 'lava' ? 'em' : 'cr']);
     }
     m.deco.push([5 * S + 8, 13 * S + 4, 'lamp']);
     m.bi = G.BIOMES.indexOf(biome);
@@ -291,13 +357,13 @@ G.World = (function () {
   // ───────────── 굴집
   W.HUB_PAL = { floor: ['#7a5642', '#83604a', '#6f4d3b'], wall: ['#5a3d30', '#654538', '#4a3128'], wallTop: '#8a6450', edge: '#2a1a14', glow: '#ffc36b' };
   W.generateHub = function () {
-    const w = 30, h = 17;
+    const w = 40, h = 17;
     const m = W.newMap(w, h, W.HUB_PAL);
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const inside = x >= 2 && x <= 27 && y >= 3 && y <= 15;
+      const inside = x >= 2 && x <= 37 && y >= 3 && y <= 15;
       m.tiles[y * w + x] = inside ? T.FLOOR : (x === 0 || y === 0 || x === w - 1 || y === h - 1 ? T.BEDROCK : T.ROCK);
     }
-    m.deco.push([15 * S, 5 * S, 'lamp'], [6 * S, 9 * S, 'lamp'], [24 * S, 9 * S, 'lamp']);
+    m.deco.push([15 * S, 5 * S, 'lamp'], [6 * S, 9 * S, 'lamp'], [24 * S, 9 * S, 'lamp'], [33 * S, 5 * S, 'lamp'], [29 * S, 11 * S, 'lamp']);
     m.bi = -1;
     return m;
   };

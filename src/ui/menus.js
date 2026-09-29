@@ -2,7 +2,7 @@
 G.Menus = (function () {
   const M = {};
   const UI = G.UI, C = G.C, PC = G.COLORS.p, RC = G.COLORS.rarity;
-  const RNAME = { c: '일반', r: '희귀', l: '전설', u: '커플' };
+  const RNAME = { c: '일반', r: '희귀', l: '전설', g: '도박' };
   const keyA = slot => (G.In.mode === 'local' ? (slot === 0 ? 'C' : '.') : 'C');
   const keyS = slot => (G.In.mode === 'local' ? (slot === 0 ? 'V' : '/') : 'V');
   const who = (v, slot) => { const p = v.ps && v.ps[slot]; return (p && p.nm) || (slot ? '2P' : '1P'); };
@@ -10,12 +10,12 @@ G.Menus = (function () {
 
   function card(c, x, y, w, h, selected, color, t, tags) {
     const col = RC[c.r];
-    UI.panel(x, y, w, h, { fill: c.r === 'u' ? 'rgba(60,24,48,0.95)' : 'rgba(30,22,48,0.96)', edge: col, lw: c.r === 'l' ? 2 : 1.2 });
+    UI.panel(x, y, w, h, { fill: c.r === 'g' ? 'rgba(12,6,18,0.97)' : 'rgba(30,22,48,0.96)', edge: col, lw: c.r === 'l' || c.r === 'g' ? 2 : 1.2 });
     if (selected) UI.select(x, y, w, h, color, t);
     UI.emoji(c.icon, x + 13, y + h / 2, 13);
     UI.text(c.name, x + 26, y + 4, { size: 8, color: col });
-    const tag = c.tag !== 'u' ? G.TAGS[c.tag] : null;
-    UI.text((tag ? tag.icon + ' ' : '💞 ') + RNAME[c.r] + (tags && tag ? `  (${tags[c.tag]}→${tags[c.tag] + 1})` : ''), x + w - 4, y + 4.5, { size: 5.5, align: 'right', color: '#b7a7cf' });
+    const tag = G.TAGS[c.tag];
+    UI.text(tag.icon + ' ' + RNAME[c.r] + (tags ? `  (${tags[c.tag]}→${tags[c.tag] + 1})` : ''), x + w - 4, y + 4.5, { size: 5.5, align: 'right', color: c.r === 'g' ? '#d7a8ff' : '#b7a7cf' });
     UI.textBlock(c.desc, x + 26, y + 15, w - 30, { size: 6.5, color: '#fff3e6' });
   }
 
@@ -134,6 +134,53 @@ G.Menus = (function () {
     }
   };
 
+  M.path = function (v, ui, t) {
+    UI.dim(0.72);
+    UI.text('🛤️ 갈림길', C.W / 2, 10, { size: 13, align: 'center', color: '#ffe9c7' });
+    if (ui.res) {
+      UI.textBlock(ui.res, C.W / 2, 60, 380, { size: 10, align: 'center', lh: 16 });
+      if (ui.pick) { const p = G.PATHS[ui.pick]; UI.emoji(p.icon, C.W / 2, 128, 28); UI.text(p.desc, C.W / 2, 150, { size: 7.5, align: 'center', color: '#b7a7cf' }); }
+      if (ui.t > 0.6) UI.text('▶ 공격 키로 출발!', C.W / 2, 190, { size: 8, align: 'center', alpha: 0.6 + Math.sin(t * 5) * 0.4 });
+      return;
+    }
+    if (!ui.rps) {
+      UI.text('다음엔 어느 굴로 갈까요? 같은 길이면 바로 출발, 다르면 가위바위보! ✌️', C.W / 2, 28, { size: 7, align: 'center', color: '#ffc6da' });
+      const w = 136, gap = 10, x0 = C.W / 2 - (w * 3 + gap * 2) / 2, y = 52;
+      ui.c.forEach((k, i) => {
+        const p = G.PATHS[k], x = x0 + i * (w + gap);
+        UI.panel(x, y, w, 108, { fill: 'rgba(40,30,64,0.95)', edge: '#8a7ab0' });
+        UI.emoji(p.icon, x + w / 2, y + 22, 22);
+        UI.text(p.name, x + w / 2, y + 40, { size: 9, align: 'center', color: '#ffe9c7' });
+        UI.textBlock(p.desc, x + 8, y + 56, w - 16, { size: 7 });
+        for (let s = 0; s < 2; s++) if (ui.sel[s] === i) {
+          UI.select(x - s * 3, y - s * 3, w + s * 6, 108 + s * 6, PC[s], t);
+          UI.text((ui.done[s] ? '✓ ' : '▼ ') + who(v, s), x + (s ? w - 4 : 4), y - 11, { size: 6.5, align: s ? 'right' : 'left', color: PC[s] });
+        }
+      });
+      for (let s = 0; s < 2; s++) UI.text(`${who(v, s)}: ${ui.done[s] ? '결정! (' + keyS(s) + ' 취소)' : '←→ 고르기 · ' + keyA(s) + ' 결정'}`, s ? C.W - 20 : 20, 176, { size: 7, color: PC[s], align: s ? 'right' : 'left' });
+      return;
+    }
+    const r = ui.rps;
+    UI.text('가고 싶은 길이 달라요! 가위바위보로 정해요 ✌️✊🖐️', C.W / 2, 30, { size: 8.5, align: 'center', color: '#ffc6da' });
+    if (r.msg) UI.text(r.msg, C.W / 2, 46, { size: 8, align: 'center', color: '#ffd36b' });
+    for (let s = 0; s < 2; s++) {
+      const x = s ? C.W / 2 + 14 : 24, w = C.W / 2 - 38, pth = G.PATHS[ui.c[ui.sel[s]]];
+      UI.text(`${who(v, s)} → ${pth.icon} ${pth.name}`, x + w / 2, 64, { size: 8, align: 'center', color: PC[s] });
+      if (r.done[s] && !mine(s)) { UI.text('골랐어요! 🤫', x + w / 2, 110, { size: 9, align: 'center', color: '#9dffb0' }); continue; }
+      G.RPS.forEach((h, k) => {
+        const bw = w / 3, bx = x + k * bw, by = 80;
+        UI.panel(bx + 3, by, bw - 6, 50, { fill: 'rgba(40,30,70,0.9)' });
+        if (r.sel[s] === k && mine(s)) UI.select(bx + 3, by, bw - 6, 50, PC[s], t);
+        UI.emoji(h.icon, bx + bw / 2, by + 20, 18); UI.text(h.name, bx + bw / 2, by + 36, { size: 7, align: 'center' });
+      });
+      UI.text(r.done[s] ? '결정! ✓' : `←→ · ${keyA(s)} 결정`, x + w / 2, 140, { size: 7.5, align: 'center', color: r.done[s] ? '#9dffb0' : '#b7a7cf' });
+    }
+  };
+  M.camp = function (v, ui, t) {
+    dialogBox('🔥 모닥불 쉼터', '타닥타닥… 따뜻한 모닥불이에요. 쓰러진 친구도 벌떡 일어나요.', ['푹 쉬기 (둘 다 최대 체력 +1칸, 체력 가득)', '카드 다듬기 (카드 한 장씩 + 새로고침 1장)', '그냥 간다'], ui.sel, PC[ui.who], t, ui.res, ui.who);
+    if (!ui.res) UI.text(`${who(v, ui.who)}가 골라요`, C.W / 2, 40, { size: 7, align: 'center', color: PC[ui.who] });
+  };
+
   M.pause = function (v, ui, t) {
     UI.dim(0.72);
     UI.text('⏸ 잠깐 쉬어요', C.W / 2, 12, { size: 12, align: 'center' });
@@ -154,7 +201,8 @@ G.Menus = (function () {
       });
       if (!cs.length) UI.text('아직 카드가 없어요', x + w / 2, y + 60, { size: 7, align: 'center', color: '#7a6a8a' });
     }
-    UI.text('유물: ' + (ui.relics.map(id => G.RELIC[id].icon).join(' ') || '없음') + (ui.syn.length ? '   시너지: ' + ui.syn.map(s => G.TAGS[s].icon).join(' ') : ''), C.W / 2, 188, { size: 7.5, align: 'center' });
+    UI.text('유물: ' + (ui.relics.map(id => G.RELIC[id].icon).join(' ') || '없음') + (ui.syn.length ? '   시너지: ' + ui.syn.map(s => G.TAGS[s].icon).join(' ') : '') +
+      (ui.curses && ui.curses.length ? `   저주 ${ui.heat}: ` + ui.curses.map(id => G.CURSE[id].icon).join('') : ''), C.W / 2, 188, { size: 7.5, align: 'center' });
     const opts = ['계속하기', ui.confirm ? '정말 포기할까요? (한 번 더 누르면 포기)' : '원정 포기하기'];
     opts.forEach((o, i) => {
       const y = 204 + i * 16;
@@ -176,12 +224,12 @@ G.Menus = (function () {
   M.result = function (v, ui, t) {
     UI.dim(0.78);
     const d = ui.data;
-    const title = ui.win ? '🌟 별빛을 되찾았어요! 🌟' : ui.gaveUp ? '오늘은 여기까지 🏕️' : '둘 다 지쳐 잠들었어요… 💤';
+    const title = ui.win ? (d.rush ? '👑 보스 러시 완주! 👑' : '🌟 별빛을 되찾았어요! 🌟') : ui.gaveUp ? '오늘은 여기까지 🏕️' : '둘 다 지쳐 잠들었어요… 💤';
     UI.text(title, C.W / 2, 12, { size: 13, align: 'center', color: ui.win ? '#fff3a0' : '#ffc6da' });
     const w = 330, x = C.W / 2 - w / 2, y = 36;
     UI.panel(x, y, w, 170);
     const rows = [
-      ['도달한 곳', d.floor > 12 ? `깊은 곳 ${d.floor}층` : `${G.biomeOf(d.floor).name} ${Math.ceil(d.floor / 3)}-${((d.floor - 1) % 3) + 1}`],
+      ['도달한 곳', d.floor > 12 ? `${G.biomeOf(d.floor, d.garden).name} ${d.floor}층` : `${G.biomeOf(d.floor).name} ${Math.ceil(d.floor / 3)}-${((d.floor - 1) % 3) + 1}`],
       ['함께한 시간', G.U.fmtTime(d.time)], ['재운 몬스터', d.kills + '마리'], ['레벨', 'Lv ' + d.lvl],
       ['가져간 광석', '💎 ' + d.gems + (ui.win ? '' : ' (70%)')], ['별조각', '⭐ ' + d.stars], ['합동기', d.combos + '번 💞'], ['캔 블록', d.ores + '개'],
     ];
@@ -201,10 +249,11 @@ G.Menus = (function () {
     if (d.revives[0] !== d.revives[1]) lines.push(`🩹 ${d.names[d.revives[0] > d.revives[1] ? 0 : 1]} — 든든한 수호천사`);
     if (d.dmg[0] !== d.dmg[1]) lines.push(`⚔️ ${d.names[d.dmg[0] > d.dmg[1] ? 0 : 1]} — 용감한 선봉장`);
     if (d.combos >= 3) lines.push('💞 척척 호흡 — 합동기 장인 커플');
-    lines.forEach((l, i) => UI.text(l, C.W / 2, y + 122 + i * 12, { size: 7.5, align: 'center', color: '#ffd36b' }));
+    for (const e of d.extra || []) lines.push(e);
+    lines.slice(0, 5).forEach((l, i) => UI.text(l, C.W / 2, y + 116 + i * 10.5, { size: 7, align: 'center', color: i < lines.length - (d.extra || []).length ? '#ffd36b' : '#e8dcff' }));
     if ((ui.t || 0) > 1.2) {
-      if (ui.win && !v.endless) {
-        ['굴집으로 돌아가기 🏡', '더 깊은 곳으로! (무한 모드) 🕳️'].forEach((o, i) => {
+      if (d.more) {
+        ['굴집으로 돌아가기 🏡', d.key ? '비밀 꽃밭으로! 🌸' : '더 깊은 곳으로! (무한 모드) 🕳️'].forEach((o, i) => {
           const oy = 212 + i * 15;
           if (ui.sel === i) UI.select(C.W / 2 - 90, oy - 2, 180, 13, '#ffd36b', t);
           UI.text(o, C.W / 2, oy, { size: 8, align: 'center' });
@@ -216,12 +265,62 @@ G.Menus = (function () {
   // ───────────── 굴집 메뉴
   M.door = function (v, ui, t) {
     const m = G.App.meta;
+    const wk = G.WEEKLY.find(w => w.id === m.weekly) || G.WEEKLY[0];
     const items = [
       { icon: '🏮', name: `원정 떠나기  ◀ 별빛 ${ui.star} ▶`, desc: ui.star ? `몬스터 체력 +${Math.round(ui.star * 14)}% · 피해 +${Math.round(ui.star * 8)}%` : (m.starLevel ? '←→ 로 별빛 단계를 골라요' : '평범한 동굴') },
+      { icon: '🌙', name: '깊은 밤 (저주 고르기)', desc: '저주를 걸수록 어렵지만 보상이 커져요' + (m.stats.bestHeat ? ` · 최고 ${m.stats.bestHeat}단계` : '') },
       { icon: '📅', name: '오늘의 동굴', desc: `${G.U.today()} — 오늘만의 동굴 모양` },
+      { icon: wk.icon, name: `이번 주 도전: ${wk.name}`, desc: wk.desc + (m.weeklyDone === m.week ? ' · 보상 받음 ✓' : ` · 6층 도달 시 ⭐+${G.WEEKLY_REWARD}`) },
+      { icon: '👑', name: m.rushOpen ? '보스 러시' : '보스 러시 🔒', desc: m.rushOpen ? `보스 4마리 연속! ${m.stats.rushBest ? '최고 기록 ' + G.HUD.clock(m.stats.rushBest) : '아직 기록 없음'}` : '보스를 두 마리 이상 재우면 열려요', dim: !m.rushOpen },
       { icon: '🏡', name: '조금 더 쉴래' },
     ];
-    listMenu('🚪 원정 문', '준비됐나요? 둘이 함께라면 무섭지 않아요 💞', items, ui.sel, PC[ui.who], t);
+    const end = listMenu('🚪 원정 문', m.meal ? `🍱 도시락 준비 완료: ${G.RECIPE[m.meal].name} — ${G.RECIPE[m.meal].desc}` : '준비됐나요? 출발하면 캐릭터를 골라요 🐾', items, ui.sel, PC[ui.who], t, C.W / 2 - 150, 22, 300);
+    if (ui.msg) UI.text(ui.msg, C.W / 2, end + 6, { size: 7.5, align: 'center', color: '#ffd36b' });
+  };
+  M.curse = function (v, ui, t) {
+    UI.dim(0.75);
+    const heat = ui.on.reduce((a, id) => a + G.CURSE[id].heat, 0);
+    const items = G.CURSES.map(c => { const on = ui.on.includes(c.id); return { icon: c.icon, name: (on ? '☑ ' : '☐ ') + c.name, desc: c.desc, right: '+' + c.heat, rc: on ? '#d7a8ff' : '#7a6a8a', dim: !on }; });
+    items.push({ icon: '🌙', name: `이 저주로 출발!  (저주 ${heat}단계)`, desc: heat ? `광석 +${Math.round(heat * C.HEAT_GEM * 100)}% · 별빛을 되찾으면 별조각 +${heat}` : '저주를 하나 이상 골라 주세요' });
+    items.push({ icon: '↩️', name: '돌아가기' });
+    const end = listMenuScroll('🌙 깊은 밤 — 저주 고르기', `별빛 ${ui.star}단계에 더해져요 · 고른 저주는 기억해 둘게요`, items, ui.sel, PC[ui.who], t, C.W / 2 - 160, 4, 320);
+    if (ui.msg) UI.text(ui.msg, C.W / 2, Math.min(end + 2, C.H - 12), { size: 7.5, align: 'center', color: '#ffd36b' });
+  };
+  M.charsel = function (v, ui, t) {
+    const m = G.App.meta, go = ui.go;
+    UI.dim(0.82);
+    const heat = (go.curses || []).reduce((a, id) => a + G.CURSE[id].heat, 0);
+    const mode = go.rush ? '👑 보스 러시' : go.weekly ? '🗓️ 이번 주 도전' : go.daily ? '📅 오늘의 동굴' : go.curses ? `🌙 깊은 밤 · 저주 ${heat}단계 · 별빛 ${go.star || 0}` : `🏮 원정 · 별빛 ${go.star || 0}`;
+    UI.text('누구로 갈까요? 🐾', C.W / 2, 5, { size: 11, align: 'center', color: '#ffe9c7' });
+    UI.text(mode, C.W / 2, 20, { size: 7, align: 'center', color: '#b7a7cf' });
+    UI.text(`⭐ ${m.stars}`, C.W - 8, 7, { size: 7, align: 'right', color: '#fff3a0' });
+    for (let i = 0; i < 2; i++) {
+      const x0 = i ? C.W / 2 + 3 : 7, w = C.W / 2 - 10;
+      UI.panel(x0, 31, w, 234, { edge: PC[i], fill: 'rgba(24,16,38,0.92)' });
+      UI.text(who(v, i), x0 + w / 2, 35, { size: 8, align: 'center', color: PC[i] });
+      const cw = (w - 16) / 4;
+      G.CHAR_ORDER.forEach((id, k) => {
+        const own = m.chars.includes(id), cx = x0 + 8 + (k % 4) * cw, cy = 48 + Math.floor(k / 4) * 40;
+        UI.panel(cx + 2, cy, cw - 4, 36, { fill: own ? 'rgba(40,30,64,0.95)' : 'rgba(20,14,30,0.95)', edge: own ? '#8a7ab0' : '#3a3050', shadow: false });
+        if (ui.sel[i] === k) UI.select(cx + 2, cy, cw - 4, 36, PC[i], t);
+        UI.ctx.globalAlpha = own ? 1 : 0.3; UI.sprite(id, cx + cw / 2 - 12, cy + 3, 1.5, i === 1); UI.ctx.globalAlpha = 1;
+        if (!own) UI.text('🔒', cx + cw - 5, cy + 2, { size: 6, align: 'right' });
+        UI.text(own ? G.CHARS[id].name : '???', cx + cw / 2, cy + 28, { size: 5.5, align: 'center' });
+      });
+      const id = G.CHAR_ORDER[ui.sel[i]], ch = G.CHARS[id], own = m.chars.includes(id), dy = 134;
+      UI.text(`${ch.emoji} ${ch.name} — ${ch.animal} · ${ch.role}`, x0 + 8, dy, { size: 8, color: '#ffe9c7' });
+      UI.textBlock(ch.desc, x0 + 8, dy + 13, w - 16, { size: 6.5, lh: 9 });
+      UI.text(`체력 ${ch.hp / 2}칸 · ${ch.skill.icon} ${ch.skill.name}`, x0 + 8, dy + 34, { size: 6.5, color: '#e8dcff' });
+      UI.text(`${ch.miner ? '⛏️채굴 ' : ''}${ch.lightPower ? '🏮결계 해제 ' : ''}${ch.passive}`, x0 + 8, dy + 45, { size: 6, color: '#b7a7cf' });
+      if (!own) {
+        const met = G.Hub.unlockMet(ch.unlock);
+        UI.text(`해금: ${ch.unlock.text} + ⭐${ch.unlock.stars}`, x0 + 8, dy + 57, { size: 6.5, color: met ? '#9dffb0' : '#ff9eb5' });
+        if (met) UI.text(`조건 달성! ${keyA(i)} 키로 별조각을 내고 데려가요`, x0 + 8, dy + 67, { size: 6, color: '#9dffb0' });
+      }
+      if (ui.msg[i]) UI.text(ui.msg[i], x0 + w / 2, dy + 80, { size: 7, align: 'center', color: '#ffd36b' });
+      if (ui.done[i]) { UI.ctx.fillStyle = 'rgba(10,6,20,0.5)'; UI.ctx.fillRect(x0 + 3, 46, w - 6, 84); UI.text('준비 완료 ✓', x0 + w / 2, 80, { size: 12, align: 'center', color: '#9dffb0' }); }
+      UI.text(ui.done[i] ? `${keyS(i)}: 다시 고르기` : `←→ 고르기 · ${keyA(i)} 결정 · ${keyS(i)} 취소`, x0 + w / 2, 252, { size: 6.5, align: 'center', color: '#e8dcff' });
+    }
   };
   function upgradeMenu(def, lv, ui, t) {
     const m = G.App.meta;
@@ -324,8 +423,10 @@ G.Menus = (function () {
         ['가장 깊이 간 곳', s.bestFloor ? s.bestFloor + '층' : '-'], ['재운 몬스터', s.kills + '마리'], ['캔 블록', s.ores + '개'], ['모은 광석', s.gemsTotal + '💎'],
         ['합동기', s.combos + '번 💞'], [`${n[0] || '1P'}가 살려준 횟수`, s.revives[0] + '번'], [`${n[1] || '2P'}가 살려준 횟수`, s.revives[1] + '번'],
         ['텔레파시 성공', s.telepathy + '번 🔮'], ['손 놓지 않은 층', s.handFloors + '개 🤝'],
+        ['낚은 물고기', (s.fish || 0) + '마리 🎣'], ['광석 대결 전적', `${(s.duel || [0, 0])[0]} : ${(s.duel || [0, 0])[1]}`],
+        ['깊은 밤 최고 단계', s.bestHeat ? s.bestHeat + '단계 🌙' : '-'], ['보스 러시 최고 기록', s.rushBest ? G.HUD.clock(s.rushBest) : '-'],
       ];
-      rows.forEach(([k, val], i) => { const y = 14 + i * 17; UI.text(k, x0 + 10, y, { size: 7.5, color: '#b7a7cf' }); UI.text(val, x0 + w0 - 10, y, { size: 8, align: 'right' }); });
+      rows.forEach(([k, val], i) => { const y = 10 + i * 14.2; UI.text(k, x0 + 10, y, { size: 7.5, color: '#b7a7cf' }); UI.text(val, x0 + w0 - 10, y, { size: 8, align: 'right' }); });
     } else {
       const page = ui.sel || 0, per = 8;
       G.ACHIEVEMENTS.slice(page * per, page * per + per).forEach((a, k) => {
@@ -345,7 +446,7 @@ G.Menus = (function () {
     const m = G.App.meta;
     const items = G.HATS.map(h => {
       const own = m.hats.includes(h.id);
-      return { icon: h.icon, name: h.name + (m.hat[ui.who] === h.id ? '  (착용 중)' : ''), right: own ? '' : h.ach ? '업적 🏆' : h.cost + '💎', dim: !own && h.ach };
+      return { icon: h.icon, name: h.name + (m.hat[ui.who] === h.id ? '  (착용 중)' : ''), right: own ? '' : h.ach ? '업적 🏆' : h.gacha ? '뽑기 🎰' : h.cost + '💎', dim: !own && (h.ach || h.gacha) };
     });
     const x = 30;
     listMenuScroll(`👒 옷장 — ${who(v, ui.who)}`, `가진 광석 💎${m.gems}`, items, ui.sel, PC[ui.who], t, x, 14, 250);
@@ -368,16 +469,16 @@ G.Menus = (function () {
     const m = G.App.meta;
     UI.dim(0.6);
     UI.text(`🪞 캐릭터 거울 — ${who(v, ui.who)}`, C.W / 2, 10, { size: 10, align: 'center', color: PC[ui.who] });
-    const n = G.CHAR_ORDER.length, w = 70, gap = 6, x0 = C.W / 2 - (n * w + (n - 1) * gap) / 2;
+    const n = G.CHAR_ORDER.length, w = 52, gap = 4, x0 = C.W / 2 - (n * w + (n - 1) * gap) / 2;
     G.CHAR_ORDER.forEach((id, i) => {
       const ch = G.CHARS[id], own = m.chars.includes(id), x = x0 + i * (w + gap), y = 32;
       UI.panel(x, y, w, 84, { edge: own ? '#8a7ab0' : '#3a3050', fill: own ? 'rgba(40,30,64,0.95)' : 'rgba(20,14,30,0.95)' });
       if (ui.sel === i) UI.select(x, y, w, 84, PC[ui.who], t);
       UI.ctx.globalAlpha = own ? 1 : 0.3;
-      UI.sprite(id, x + w / 2 - 16, y + 8, 2, false);
+      UI.sprite(id, x + w / 2 - 12, y + 10, 1.5, false);
       UI.ctx.globalAlpha = 1;
       UI.text(own ? ch.name : '???', x + w / 2, y + 46, { size: 8, align: 'center' });
-      UI.text(ch.role, x + w / 2, y + 58, { size: 6, align: 'center', color: '#b7a7cf' });
+      UI.text(ch.role, x + w / 2, y + 58, { size: 5, align: 'center', color: '#b7a7cf' });
       if (m.char[0] === id) UI.text('1P', x + 6, y + 4, { size: 6, color: PC[0] });
       if (m.char[1] === id) UI.text('2P', x + w - 6, y + 4, { size: 6, color: PC[1], align: 'right' });
       if (!own) UI.text('⭐' + ch.unlock.stars, x + w / 2, y + 70, { size: 7, align: 'center', color: '#fff3a0' });
@@ -386,7 +487,7 @@ G.Menus = (function () {
     UI.panel(40, 126, C.W - 80, 92);
     UI.text(`${ch.emoji} ${ch.name} — ${ch.animal} · ${ch.role}`, 52, 132, { size: 9, color: '#ffe9c7' });
     UI.textBlock(ch.desc, 52, 148, C.W - 104, { size: 7.5 });
-    UI.text(`공격: ${{ orb: '빛 구슬', swing: '곡괭이 휘두르기', bomb: '폭탄 던지기', bash: '등껍질 박치기', dart: '반딧불 화살', acorn: '튕기는 도토리' }[ch.atk.type]} · 스킬: ${ch.skill.icon} ${ch.skill.name} · 패시브: ${ch.passive}`, 52, 172, { size: 6.5, color: '#b7a7cf' });
+    UI.text(`공격: ${{ orb: '빛 구슬', swing: '곡괭이 휘두르기', bomb: '폭탄 던지기', bash: '등껍질 박치기', dart: '반딧불 화살', acorn: '튕기는 도토리', rune: '마법진', snow: '눈덩이' }[ch.atk.type]} · 스킬: ${ch.skill.icon} ${ch.skill.name} · 패시브: ${ch.passive}`, 52, 172, { size: 6.5, color: '#b7a7cf' });
     UI.text(`체력 ${ch.hp / 2}칸 · 빛 ${ch.light} · ${ch.miner ? '⛏️ 채굴 가능' : ''} ${ch.lightPower ? '🏮 결계 해제' : ''}`, 52, 184, { size: 6.5, color: '#b7a7cf' });
     if (!own) UI.text(`해금 조건: ${ch.unlock.text} + ⭐${ch.unlock.stars}  ${G.Hub.unlockMet(ch.unlock) ? '(조건 달성! ✓)' : ''}`, 52, 198, { size: 7, color: G.Hub.unlockMet(ch.unlock) ? '#9dffb0' : '#ff9eb5' });
     if (ui.msg) UI.text(ui.msg, C.W / 2, 226, { size: 7.5, align: 'center', color: '#ffd36b' });
@@ -395,9 +496,111 @@ G.Menus = (function () {
 
   M.deco = function (v, ui, t) {
     const m = G.App.meta;
-    const items = G.FURNITURE.map(f => ({ icon: f.icon, name: f.name, right: m.fur.includes(f.id) ? '✓ 있음' : f.cost + '💎', rc: m.fur.includes(f.id) ? '#9dffb0' : G.COLORS.gold }));
+    const items = G.FURNITURE.map(f => ({ icon: f.icon, name: f.name, right: m.fur.includes(f.id) ? '✓ 있음' : f.gacha ? '뽑기 🎰' : f.cost + '💎', rc: m.fur.includes(f.id) ? '#9dffb0' : f.gacha ? '#b7a7cf' : G.COLORS.gold, dim: !m.fur.includes(f.id) && f.gacha }));
     const end = listMenuScroll('🛋️ 가구 가게', `가진 광석 💎${m.gems} · 산 가구는 굴집에 바로 놓여요`, items, ui.sel, PC[ui.who], t, C.W / 2 - 130, 14, 260);
     if (ui.msg) UI.text(ui.msg, C.W / 2, Math.min(end + 4, C.H - 14), { size: 7.5, align: 'center', color: '#ffd36b' });
+  };
+
+  M.gacha = function (v, ui, t) {
+    const m = G.App.meta, x = C.W / 2, y = 34;
+    UI.dim(0.7);
+    UI.panel(x - 115, y, 230, 180, { edge: '#ff7aa8' });
+    UI.text('🎰 광석 뽑기', x, y + 8, { size: 11, align: 'center', color: '#ffe9c7' });
+    UI.text(`한 번에 💎${G.GACHA_COST} · 가진 광석 💎${m.gems}`, x, y + 24, { size: 7, align: 'center', color: '#b7a7cf' });
+    if (ui.anim > 0) {
+      UI.emoji(['🎁', '⭐', '💎', '🥚', '🧸', '🍄', '👒'][Math.floor(t * 14) % 7], x, y + 82, 30 + Math.sin(t * 30) * 2);
+      UI.text('두구두구두구…', x, y + 112, { size: 8, align: 'center', color: '#ffc6da' });
+    } else if (ui.res) {
+      if (ui.res.rare) for (let i = 0; i < 8; i++) { const a = t * 2 + i * 0.785; UI.text('✦', x + Math.cos(a) * 34, y + 78 + Math.sin(a) * 22, { size: 7, align: 'center', color: '#fff3a0', outline: false }); }
+      UI.emoji(ui.res.icon, x, y + 78, 32);
+      UI.text(ui.res.name, x, y + 104, { size: 10, align: 'center', color: ui.res.rare ? '#ffd36b' : '#fff3e6' });
+      UI.text(ui.res.text, x, y + 120, { size: 7, align: 'center', color: '#b7a7cf' });
+    } else UI.textBlock('모자 · 가구 · 알 · 별조각 · 광석 보따리가 나와요!\n이미 가진 게 나오면 광석으로 돌려받아요.', x - 95, y + 64, 190, { size: 7.5, lh: 12 });
+    if (ui.msg) UI.text(ui.msg, x, y + 140, { size: 7.5, align: 'center', color: '#ff9eb5' });
+    UI.text(`${keyA(ui.who)}: 뽑기 · ${keyS(ui.who)}: 나가기`, x, y + 160, { size: 7, align: 'center', color: '#e8dcff' });
+  };
+  M.nest = function (v, ui, t) {
+    const m = G.App.meta;
+    UI.dim(0.6);
+    const items = (m.pets || []).map((pd, i) => {
+      const d = G.PETS[pd.sp], st = G.petStage(pd.xp), owner = m.petOf[0] === i ? 0 : m.petOf[1] === i ? 1 : -1;
+      return { icon: d.icon, name: d.names[st] + (st < 2 ? `  (진화까지 원정 ${(st === 0 ? 3 : 8) - pd.xp}번)` : '  ✨최종 진화'), desc: d.desc,
+        right: owner >= 0 ? who(v, owner) + ' 따라감' : '쉬는 중', rc: owner >= 0 ? PC[owner] : '#7a6a8a' };
+    });
+    if (!items.length) items.push({ icon: '🥚', name: '아직 펫이 없어요', desc: '알은 상자·미믹·보스·광석 뽑기에서 나와요', dim: true });
+    const end = listMenuScroll('🪺 펫 둥지', `${who(v, ui.who)}: ${keyA(ui.who)} 데려가기 / 쉬게 하기 · 원정을 함께 갈수록 진화해요`, items, ui.sel, PC[ui.who], t, C.W / 2 - 160, 12, 320);
+    const eggs = m.eggs || [];
+    UI.text(eggs.length ? '품는 중: ' + eggs.map(w => `🥚${Math.min(w, G.EGG_WARM)}/${G.EGG_WARM}`).join(' ') + '  (원정을 다녀오면 따뜻해져요)' : '품는 중인 알이 없어요', C.W / 2, Math.min(end + 6, C.H - 26), { size: 7, align: 'center', color: '#fff3e0' });
+    if (ui.msg) UI.text(ui.msg, C.W / 2, C.H - 13, { size: 7.5, align: 'center', color: '#ffd36b' });
+  };
+  const fishSummary = f => G.FISH.filter(x => !x.junk).map(x => x.icon + (f[x.id] || 0)).join(' ');
+  M.pond = function (v, ui, t) {
+    const m = G.App.meta;
+    UI.dim(0.5);
+    listMenu('🎣 굴집 낚시터', '가진 물고기 ' + fishSummary(m.fish || {}), [
+      { icon: '🎣', name: '낚시하기', desc: '둘이 같이! 찌가 쏙 들어가면 바로 공격 키' },
+      { icon: '🍳', name: '요리하기', desc: '물고기로 다음 원정 도시락을 만들어요' + (m.meal ? ` (지금: ${G.RECIPE[m.meal].name})` : '') },
+      { icon: '👋', name: '나가기' },
+    ], ui.sel, PC[ui.who], t);
+  };
+  M.fish = function (v, ui, t) {
+    const m = G.App.meta, ctx = UI.ctx;
+    UI.dim(0.55);
+    UI.text('🎣 굴집 낚시', C.W / 2, 8, { size: 11, align: 'center', color: '#ffe9c7' });
+    for (let i = 0; i < 2; i++) {
+      const r = ui.f[i], x = i ? C.W / 2 + 8 : 18, w = C.W / 2 - 26, y = 28;
+      UI.panel(x, y, w, 160, { edge: PC[i], fill: 'rgba(20,24,48,0.92)' });
+      UI.text(who(v, i), x + w / 2, y + 5, { size: 8, align: 'center', color: PC[i] });
+      const bx = x + w / 2, by = y + 86;
+      ctx.fillStyle = '#23406e'; UI.rr(x + 8, y + 64, w - 16, 50, 6); ctx.fill();
+      ctx.fillStyle = '#3a6aa8'; ctx.fillRect(x + 8, y + 64, w - 16, 3);
+      if (r.s === 'wait' || r.s === 'bite') {
+        const dip = r.s === 'bite' ? 5 + Math.sin(t * 30) * 2 : Math.sin(t * 3);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(bx + 30, y + 30); ctx.lineTo(bx, by - 6 + dip); ctx.stroke();
+        ctx.fillStyle = '#ff5c7a'; ctx.fillRect(bx - 3, by - 6 + dip, 6, 4); ctx.fillStyle = '#ffffff'; ctx.fillRect(bx - 3, by - 2 + dip, 6, 3);
+        if (r.s === 'bite') UI.text('!', bx, by - 42, { size: 22, align: 'center', color: '#ffd36b' });
+      }
+      if (r.s === 'got' && r.fish) UI.emoji(G.FISHD[r.fish].icon, bx, y + 44, 22);
+      const txt = r.s === 'idle' ? `${keyA(i)}: 낚싯대 던지기` : r.s === 'wait' ? '두근두근… 기다려요' : r.s === 'bite' ? `지금이야! ${keyA(i)}!!` : r.msg;
+      UI.textBlock(txt, x + w / 2, y + 124, w - 16, { size: 7.5, align: 'center', lh: 11, color: r.s === 'bite' ? '#ffd36b' : '#fff3e6' });
+    }
+    UI.text('가진 물고기 ' + fishSummary(m.fish || {}), C.W / 2, 196, { size: 8, align: 'center' });
+    UI.text(`${keyS(0)}${G.In.mode === 'local' ? ' / ' + keyS(1) : ''}: 그만하기`, C.W / 2, 212, { size: 6.5, align: 'center', color: '#b7a7cf' });
+  };
+  M.cook = function (v, ui, t) {
+    const m = G.App.meta, f = m.fish || {};
+    UI.dim(0.6);
+    const items = G.RECIPES.map(r => {
+      const ok = Object.entries(r.need).every(([id, c]) => (f[id] || 0) >= c);
+      return { icon: r.icon, name: r.name + (m.meal === r.id ? '  (준비됨 ✓)' : ''), desc: r.desc + ' · 재료 ' + Object.entries(r.need).map(([id, c]) => G.FISHD[id].icon + '×' + c).join(' '),
+        right: ok ? '만들기' : '재료 부족', rc: ok ? '#9dffb0' : '#7a6a8a', dim: !ok };
+    });
+    items.push({ icon: '👋', name: '나가기' });
+    const end = listMenuScroll('🍳 동굴 부엌', '다음 원정 도시락 (하나만) · 가진 물고기 ' + fishSummary(f), items, ui.sel, PC[ui.who], t, C.W / 2 - 175, 14, 350);
+    if (ui.msg) UI.text(ui.msg, C.W / 2, Math.min(end + 6, C.H - 14), { size: 7.5, align: 'center', color: '#ffd36b' });
+  };
+  M.duelask = function (v, ui, t) {
+    const m = G.App.meta, rec = m.stats.duel || [0, 0];
+    UI.dim(0.5);
+    listMenu('⚔️ 광석 캐기 대결', '60초 동안 광석을 더 많이 캔 사람이 승리! 진 사람은 다음 원정에 벌칙 모자 🤡', [
+      { icon: '⛏️', name: '대결 시작!', desc: `통산 전적  ${who(v, 0)} ${rec[0]} : ${rec[1]} ${who(v, 1)}` },
+      { icon: '👋', name: '다음에 하자' },
+    ], ui.sel, PC[ui.who], t, C.W / 2 - 160, 60, 320);
+  };
+  M.duelres = function (v, ui, t) {
+    UI.dim(0.75);
+    UI.text(ui.w < 0 ? '무승부! 🤝' : `${ui.names[ui.w]} 승리! 🏆`, C.W / 2, 24, { size: 16, align: 'center', color: '#fff3a0' });
+    for (let i = 0; i < 2; i++) {
+      const x = C.W / 2 + (i ? 70 : -70);
+      if (ui.w === i) UI.emoji('👑', x, 58, 16);
+      UI.sprite(ui.chars[i], x - 24, 68, 3, i === 1);
+      if (ui.w === 1 - i) UI.hat(ui.chars[i], G.PENALTY_HAT, x - 24, 68, 3, i === 1);
+      UI.text(ui.names[i], x, 122, { size: 9, align: 'center', color: PC[i] });
+      UI.text('💎 ' + ui.score[i], x, 136, { size: 12, align: 'center', color: G.COLORS.gold });
+    }
+    UI.text(`통산 전적  ${ui.names[0]} ${ui.rec[0]} : ${ui.rec[1]} ${ui.names[1]}`, C.W / 2, 166, { size: 8, align: 'center' });
+    if (ui.w >= 0) UI.text(`${ui.names[1 - ui.w]}는 다음 원정에 벌칙 모자를 써요 🤡`, C.W / 2, 182, { size: 7.5, align: 'center', color: '#ff9eb5' });
+    if (ui.t > 1.2) UI.text('▶ 공격 키로 굴집으로', C.W / 2, 210, { size: 8, align: 'center', alpha: 0.6 + Math.sin(t * 5) * 0.4 });
   };
 
   M.draw = function (v, t) {

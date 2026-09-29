@@ -13,12 +13,13 @@ G.Cb = (function () {
       magnet: C.MAGNET, crit: 0.05, critMul: 1.8, pierce: 0, multi: 0, knock: 1, regen: 0, block: ch === 'kkobuk' ? 0.2 : 0,
       thorns: 0, xpMul: 1, burn: 0, slow: 0, chain: 0, chainN: 2, area: 1, fireball: 0, iceNova: 0, thunder: 0, fruit: 0,
       starshot: 0, vamp: 0, orbit: 0, aura: 0, brittle: 0, phoenix: 0, blizzard: 0, dragon: 0, fearMul: 1, lastStand: 0,
+      lone: 0, owl: 0, hurtPlus: 0,
     };
   };
   Cb.teamStats = function () {
     return { beamRange: 1, beamDmg: 1, heartGain: 1, reviveSpd: 1, reviveHp: 0, xpMul: 1, gemMul: 1, oreMul: 1, healMul: 1, luck: 0,
-      rerolls: 0, shopDisc: 0, floorHeal: 0, featherShield: 0, treasureMap: 0, chestMul: 1, mineMul: 1, shareHeal: 0, guard: 0,
-      reunion: 0, ring: 0, comboDmg: 1, startHeart: 0, beamNoFear: 0, startRelic: 0 };
+      rerolls: 0, shopDisc: 0, floorHeal: 0, featherShield: 0, treasureMap: 0, chestMul: 1, mineMul: 1,
+      comboDmg: 1, startHeart: 0, beamNoFear: 0, startRelic: 0 };
   };
   Cb.newPlayer = function (slot, ch, name, hat, save) {
     const st = Cb.baseStats(ch, save);
@@ -46,11 +47,11 @@ G.Cb = (function () {
 
   function dmgMul(run, p) {
     let m = p.st.dmg;
-    if (run.team.st.ring) { let n = 0; for (const q of run.players) for (const id in q.cards) if (G.CARD[id].r === 'u') n += q.cards[id]; m += n * 0.06; }
     if (p.st.lastStand && p.hp <= 2) m += p.st.lastStand;
     if (p.buffT > 0) m += p.buff;
-    if (run.synergy.includes('star')) m += 0;
-    return m;
+    if (p.st.lone && !run.tether.on) m += p.st.lone;
+    if (p.st.owl && !p.lit) m += p.st.owl;
+    return Math.max(0.2, m);
   }
   Cb.dmgMul = dmgMul;
 
@@ -86,15 +87,15 @@ G.Cb = (function () {
     p.atkCount++;
     const extra = p.st.multi;
     switch (atk.type) {
-      case 'orb': case 'dart': case 'acorn': {
+      case 'orb': case 'dart': case 'acorn': case 'snow': {
         const a0 = aimAssist(run, p, 150);
         const n = (atk.count || 1) + extra;
         for (let i = 0; i < n; i++) {
           const a = a0 + (n > 1 ? (i - (n - 1) / 2) * (atk.type === 'dart' ? 0.28 : 0.18) : 0);
           Cb.proj(run, { k: atk.type, owner: p.slot, x: p.x + Math.cos(a) * 6, y: p.y + Math.sin(a) * 6, vx: Math.cos(a) * atk.speed, vy: Math.sin(a) * atk.speed,
-            dmg: atk.dmg * m, life: atk.life, r: atk.r || 3, homing: atk.homing || 0, pierce: p.st.pierce, bounce: (atk.bounce || 0) + (atk.type === 'acorn' ? p.st.pierce : 0), light: atk.type === 'orb' ? 22 : atk.type === 'dart' ? 16 : 0 });
+            dmg: atk.dmg * m, life: atk.life, r: atk.r || 3, homing: atk.homing || 0, pierce: p.st.pierce, bounce: (atk.bounce || 0) + (atk.type === 'acorn' ? p.st.pierce : 0), light: atk.type === 'orb' ? 22 : atk.type === 'dart' ? 16 : 0, chill: atk.type === 'snow' ? 2 : 0 });
         }
-        fx('snd', atk.type === 'orb' ? 'orb' : atk.type === 'dart' ? 'dart' : 'acorn');
+        fx('snd', atk.type === 'orb' ? 'orb' : atk.type === 'acorn' ? 'acorn' : 'dart');
         p.a = a0; p.f = Math.cos(a0) >= 0 ? 1 : -1;
         break;
       }
@@ -109,6 +110,20 @@ G.Cb = (function () {
           Cb.proj(run, { k: 'bomb', owner: p.slot, x: p.x, y: p.y, sx: p.x, sy: p.y, tx, ty, ft, life: ft + atk.fuse + 0.05, dmg: atk.dmg * m, rad: atk.radius * p.st.area, lob: true, fuse: atk.fuse });
         }
         fx('snd', 'throw');
+        p.a = a0; p.f = Math.cos(a0) >= 0 ? 1 : -1;
+        break;
+      }
+      case 'rune': {
+        // 적이 있는 자리에 마법진 → 잠시 뒤 터짐
+        const targets = allTargets(run).filter(e => U.dist(p.x, p.y, e.x, e.y) < atk.range).sort((a, b) => U.dist2(p.x, p.y, a.x, a.y) - U.dist2(p.x, p.y, b.x, b.y));
+        const n = 1 + extra;
+        const a0 = aimAssist(run, p, atk.range);
+        for (let i = 0; i < n; i++) {
+          const e = targets[i] || targets[0];
+          const tx = e ? e.x + (i && !targets[i] ? (Math.random() - 0.5) * 30 : 0) : p.x + Math.cos(a0) * 60, ty = e ? e.y : p.y + Math.sin(a0) * 60;
+          Cb.proj(run, { k: 'rune', owner: p.slot, x: tx, y: ty, still: true, life: atk.delay, fuse: atk.delay, dmg: atk.dmg * m, rad: atk.radius * p.st.area * 1.2, light: 18 });
+        }
+        fx('snd', 'orb');
         p.a = a0; p.f = Math.cos(a0) >= 0 ? 1 : -1;
         break;
       }
@@ -214,11 +229,22 @@ G.Cb = (function () {
         for (const o of run.objects) if (o.k === 'door' && o.st === 0 && U.dist(p.x, p.y, o.x, o.y) < rad) o.prog = Math.min(1, (o.prog || 0) + 0.35);
         break;
       }
-      case 'roll': {
+      case 'meteor': {
+        const e0 = nearestEnemy(run, p.x, p.y, 150);
+        const cx = e0 ? e0.x : p.x + Math.cos(p.a) * 50, cy = e0 ? e0.y : p.y + Math.sin(p.a) * 50;
+        for (let i = 0; i < sk.n + p.st.multi; i++) {
+          const a = Math.random() * TAU, r = i ? 12 + Math.random() * 40 : 0;
+          const tx = cx + Math.cos(a) * r, ty = cy + Math.sin(a) * r * 0.8, life = 0.55 + i * 0.16;
+          Cb.proj(run, { k: 'meteor', owner: p.slot, x: tx, y: ty, still: true, life, fuse: life, dmg: sk.dmg * m, rad: sk.radius * p.st.area * 1.2, light: 20, z: life * 150 });
+        }
+        fx('snd', 'wish'); fx('say', p.slot, '별똥별아~!');
+        break;
+      }
+      case 'slide': case 'roll': {
         const a = p.moving ? Math.atan2(p.iy, p.ix) : p.a;
         p.state = 'd'; p.dashT = sk.dur; p.dvx = Math.cos(a) * sk.dist / sk.dur; p.dvy = Math.sin(a) * sk.dist / sk.dur; p.dashHit = new Set(); p.a = a;
         p.f = Math.cos(a) >= 0 ? 1 : -1;
-        fx('snd', 'dash'); fx('burst', p.x, p.y, 8, '#c8b8a0', 40, 0.4);
+        fx('snd', 'dash'); fx('burst', p.x, p.y, 8, sk.type === 'slide' ? '#bfefff' : '#c8b8a0', 40, 0.4);
         break;
       }
       case 'bigbomb': {
@@ -315,7 +341,8 @@ G.Cb = (function () {
     if (p) run.stats.dmg[p.slot] += d;
     if (G.settings.dmgNum !== false || true) fx('dmg', e.x, e.y - (e.boss ? 30 : 12), d, crit ? 1 : 0);
     if (crit) { fx('snd', 'crit'); run.hitstop = Math.max(run.hitstop, 0.05); } else if (src.kind !== 'dot' && src.kind !== 'beam') fx('snd', 'hit');
-    if (src.knock && !e.boss && !(def && def.heavy)) {
+    if (def && def.ai === 'flee' && src.kind !== 'dot' && src.kind !== 'beam' && Math.random() < 0.7) Cb.drop(run, 'gem', e.x, e.y, 1, 1);
+    if (src.knock && !e.boss && !(def && def.heavy) && e.affix !== 'tough') {
       const a = U.ang(src.x, src.y, e.x, e.y);
       const k = src.knock * (e.elite ? 0.5 : 1) * (def && def.ai === 'slam' ? 0.3 : 1);
       e.kvx += Math.cos(a) * k; e.kvy += Math.sin(a) * k;
@@ -366,8 +393,25 @@ G.Cb = (function () {
       for (let i = 0; i < small; i++) Cb.drop(run, 'xp', e.x, e.y, 1, 1);
     }
     if (Math.random() < (e.elite ? 1 : 0.22)) Cb.drop(run, 'gem', e.x, e.y, e.elite ? 6 : 1, 1);
-    if (e.elite) { Cb.drop(run, 'heart', e.x, e.y, 1, 2); if (Math.random() < 0.35) Cb.drop(run, 'gemb', e.x, e.y, 1, 5); }
-    else if (Math.random() < 0.025) Cb.drop(run, 'heart', e.x, e.y, 1, 2);
+    if (e.elite) {
+      Cb.drop(run, 'heart', e.x, e.y, 1, 2); if (Math.random() < 0.35) Cb.drop(run, 'gemb', e.x, e.y, 1, 5);
+      if (Math.random() < 0.2) Cb.drop(run, 'relic', e.x, e.y, 1, 1);
+      if (Math.random() < 0.04) Cb.drop(run, 'egg', e.x, e.y, 1, 1);
+    } else if (Math.random() < 0.025 * (run.curse.hunger ? 0.4 : 1)) Cb.drop(run, 'heart', e.x, e.y, 1, 2);
+    if (e.type === 'goldmole') {
+      run.stats.moles++;
+      Cb.drop(run, 'gem', e.x, e.y, 10 + run.floor, 2); Cb.drop(run, 'gemb', e.x, e.y, 4, 5);
+      if (Math.random() < 0.5) Cb.drop(run, 'star', e.x, e.y, 1, 1);
+      fx('banner', '보물 두더지를 잡았다! 🦫', '광석이 와르르~'); fx('snd', 'chest');
+    }
+    if (e.type === 'mimic') {
+      run.stats.mimics++;
+      Cb.drop(run, 'gem', e.x, e.y, Math.round((6 + run.floor) * 2 * run.team.st.chestMul), 1);
+      Cb.drop(run, 'heart', e.x, e.y, 2, 2); Cb.drop(run, 'star', e.x, e.y, 1, 1);
+      if (Math.random() < 0.3) Cb.drop(run, 'egg', e.x, e.y, 1, 1);
+      run.pendingLv++;
+      fx('txt', e.x, e.y - 24, '보물 두 배! 🎁🎁', '#ffd36b', 9); fx('snd', 'chest');
+    }
     if (p && p.st.fruit && Math.random() < p.st.fruit) Cb.drop(run, 'fruit', e.x, e.y, 1, 1);
     if (p && p.st.vamp && Math.random() < p.st.vamp) Cb.heal(run, p, 1);
     const beam = run.tether.on;
@@ -382,8 +426,7 @@ G.Cb = (function () {
     for (const o of run.objects) if (o.k === 'dome' && U.dist(o.x, o.y, p.x, p.y) < o.ex) return false;
     if (run.team.st.featherShield && !p.featherUsed) { p.featherUsed = true; p.inv = 0.8; fx('txt', p.x, p.y - 20, '깃털 보호!', '#ffffff', 7); fx('snd', 'block'); return false; }
     if (p.st.block && Math.random() < p.st.block) { p.inv = 0.4; fx('txt', p.x, p.y - 20, '막았다!', '#bfefff', 7); fx('snd', 'block'); fx('burst', p.x, p.y - 6, 5, '#bfefff', 40, 0.3); return false; }
-    if (run.team.st.guard && run.tether.on && Math.random() < 0.3) { p.inv = 0.4; fx('txt', p.x, p.y - 20, '지켜줄게!', '#ff7aa8', 7); fx('snd', 'block'); return false; }
-    let d = dmg * (1 + run.star * C.STAR_DMG);
+    let d = dmg * (1 + run.star * C.STAR_DMG) + (p.st.hurtPlus || 0);
     d = Math.floor(d) + (Math.random() < d % 1 ? 1 : 0);
     d = Math.max(1, d);
     p.hp -= d; p.inv = C.IFRAMES; p.flash = 0.12;
@@ -399,7 +442,7 @@ G.Cb = (function () {
         fx('banner', '불사조!', p.name + ' 부활 🔥'); fx('ring', p.x, p.y - 6, 4, 60, '#ff8a4c', 0.5); fx('snd', 'revive');
         return true;
       }
-      p.state = 'x'; p.downT = C.DOWN_TIME; p.rv = 0; p.vx = p.vy = 0;
+      p.state = 'x'; p.downT = run.downTime || C.DOWN_TIME; p.rv = 0; p.vx = p.vy = 0;
       fx('snd', 'down');
       const q = run.players[1 - p.slot];
       fx('say', p.slot, '으앙… 😢');
@@ -451,20 +494,24 @@ G.Cb = (function () {
       }
     }
   };
+  Cb.collect = (run, k, p) => collect(run, k, p);
   function collect(run, k, p) {
     const T = run.team;
     switch (k.k) {
       case 'xp': case 'xpb':
         T.xp += k.v * T.st.xpMul * p.st.xpMul; fx('snd', 'xp'); return true;
       case 'gem': case 'gemb':
-        T.gems += k.v * T.st.gemMul; run.stats.gems += k.v * T.st.gemMul; fx('snd', 'gem'); fx('txt', p.x, p.y - 20, '+' + Math.round(k.v * T.st.gemMul) + '💎', '#ffd36b', 6); return true;
+      { const g = k.v * T.st.gemMul * (run.fmod === 'gold' ? 2 : 1);
+        T.gems += g; run.stats.gems += g; fx('snd', 'gem'); fx('txt', p.x, p.y - 20, '+' + Math.round(g) + '💎', '#ffd36b', 6); return true; }
       case 'star': T.stars += 1; fx('snd', 'ach'); fx('txt', p.x, p.y - 20, '+1 별조각 ⭐', '#fff3a0', 8); return true;
       case 'heart':
         if (p.hp >= p.st.maxHp) { const q = run.players[1 - p.slot]; if (!(Cb.active(q) && q.hp < q.st.maxHp)) return false; }
         Cb.heal(run, p, 2);
-        if (T.st.shareHeal) Cb.heal(run, run.players[1 - p.slot], 1, true);
         return true;
-      case 'fruit': Cb.heal(run, p, 1); if (T.st.shareHeal) Cb.heal(run, run.players[1 - p.slot], 1, true); return true;
+      case 'fruit': Cb.heal(run, p, 1); return true;
+      case 'relic': run.pendingRelic = true; fx('txt', p.x, p.y - 24, '유물 상자! 🎁', '#ffd36b', 8); fx('snd', 'chest'); return true;
+      case 'egg': run.eggsFound++; fx('txt', p.x, p.y - 24, '알을 주웠어요! 🥚', '#fff3e0', 8); fx('snd', 'ach'); fx('say', p.slot, '굴집에서 품어 주자!'); return true;
+      case 'key': run.flowerKey = true; fx('banner', '🌸 꽃잎 열쇠', '가장 깊은 곳 너머, 비밀의 문이 열릴 것 같아요…'); fx('snd', 'wish'); return true;
       case 'lampshroom': p.lightTemp = true; p.lightR = Math.max(p.lightR, 80); fx('say', p.slot, '빛 버섯이다! 🍄'); fx('snd', 'pick'); return true;
       case 'pickcrate': p.mineTemp = true; fx('say', p.slot, '곡괭이 획득! ⛏️'); fx('snd', 'pick'); return true;
       case 'lunch': {
@@ -494,6 +541,7 @@ G.Cb = (function () {
         if (k >= 1 && !pr.landed) { pr.landed = true; pr.z = 0; if (pr.owner < 0) { explodeEnemy(run, pr); dead = true; } }
         if (pr.landed && pr.owner >= 0 && pr.life <= 0) { explode(run, pr); dead = true; }
       } else if (pr.still) {
+        if (pr.k === 'meteor') pr.z = Math.max(0, pr.life * 150);
         if (pr.life <= 0) { explode(run, pr); dead = true; }
         pr.hot = pr.life < 0.4;
       } else if (pr.swarm) {
@@ -546,6 +594,7 @@ G.Cb = (function () {
             if (U.dist2(pr.x, pr.y, e.x, e.y - (e.boss ? 10 : 3)) > (e.r + pr.r) * (e.r + pr.r)) continue;
             const ok = Cb.hitEnemy(run, e, pr.dmg, { p: run.players[pr.owner], kind: 'proj', x: pr.x - pr.vx * 0.05, y: pr.y - pr.vy * 0.05, knock: 50, burn: pr.burn });
             pr.hit.add(e.id);
+            if (pr.chill && ok) e.slowT = Math.max(e.slowT, pr.chill);
             if (pr.explode) { explode(run, Object.assign(pr, { rad: pr.explode })); dead = true; break; }
             if (pr.k === 'acorn' && pr.bounce > 0 && ok) {
               pr.bounce--;
@@ -561,7 +610,7 @@ G.Cb = (function () {
           for (const o of run.objects) if (o.k === 'dome' && U.dist(o.x, o.y, pr.x, pr.y) < o.ex) { dead = true; fx('burst', pr.x, pr.y, 4, '#c8ffc0', 30, 0.2); }
           if (!dead) for (const p of run.players) {
             if (!Cb.active(p)) continue;
-            if (U.dist2(pr.x, pr.y, p.x, p.y - 3) < (p.r + pr.r) * (p.r + pr.r)) { Cb.hurt(run, p, pr.dmg, { x: pr.x - pr.vx, y: pr.y - pr.vy }); dead = true; break; }
+            if (U.dist2(pr.x, pr.y, p.x, p.y - 3) < (p.r + pr.r) * (p.r + pr.r)) { if (Cb.hurt(run, p, pr.dmg, { x: pr.x - pr.vx, y: pr.y - pr.vy }) && pr.slow) p.slowT = pr.slow; dead = true; break; }
           }
         }
         if (pr.life <= 0) { if (pr.explode) explode(run, Object.assign(pr, { rad: pr.explode })); dead = true; }
@@ -573,8 +622,15 @@ G.Cb = (function () {
 
   function explode(run, pr) {
     const rad = pr.rad || 24, p = run.players[pr.owner];
-    fx('boom', pr.x, pr.y, rad, pr.big ? 1 : 0);
-    fx('snd', pr.big ? 'bigboom' : 'boom'); fx('shake', pr.big ? 6 : 3);
+    if (pr.k === 'rune' || pr.k === 'meteor') {
+      const rune = pr.k === 'rune';
+      fx('ring', pr.x, pr.y - 2, 3, rad, rune ? '#d7a8ff' : '#fff3a0', 0.3);
+      fx('burst', pr.x, pr.y - 4, rune ? 8 : 14, ['#d7a8ff', '#ffffff', '#fff3a0'], rad * 3, 0.4);
+      fx('snd', rune ? 'hit' : 'boom'); if (!rune) fx('shake', 2);
+    } else {
+      fx('boom', pr.x, pr.y, rad, pr.big ? 1 : 0);
+      fx('snd', pr.big ? 'bigboom' : 'boom'); fx('shake', pr.big ? 6 : 3);
+    }
     for (const e of allTargets(run)) {
       if (U.dist(pr.x, pr.y, e.x, e.y) > rad + e.r) continue;
       Cb.hitEnemy(run, e, pr.dmg, { p, kind: 'aoe', x: pr.x, y: pr.y, knock: pr.big ? 180 : 90, mine: true, burn: pr.burn });

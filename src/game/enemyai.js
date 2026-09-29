@@ -68,10 +68,12 @@ G.AI = (function () {
 
   function speed(e) { return e.spd * (e.slowT > 0 ? 0.5 : 1) * (e.fear ? 0.8 : 1); }
   function trail(run, e, dt) {
-    if (!e.def.trail) return;
+    const k = e.def.trail || (e.affix === 'fire' ? 'fire' : null);
+    if (!k) return;
     e.trailT = (e.trailT || 0) - dt;
-    if (e.trailT <= 0 && Math.hypot(e.vx, e.vy) > 8) { e.trailT = e.def.trail === 'fire' ? 0.5 : 0.7; G.Run.hazard(run, e.def.trail, e.x, e.y + 2, e.def.trail === 'fire' ? 7 : 9, e.def.trail === 'fire' ? 2.2 : 4); }
+    if (e.trailT <= 0 && Math.hypot(e.vx, e.vy) > 8) { e.trailT = k === 'fire' ? 0.5 : 0.7; G.Run.hazard(run, k, e.x, e.y + 2, k === 'fire' ? 7 : 9, k === 'fire' ? 2.2 : 4); }
   }
+  const SHOT = { star: 'estar', shard: 'shard', snow: 'snow', petal: 'petal' };
 
   AI.update = function (run, e, dt) {
     e.t += dt;
@@ -94,16 +96,30 @@ G.AI = (function () {
     if (e.stun > 0 || e.frozen > 0 || !p) { e.vx *= 0.8; e.vy *= 0.8; return; }
     const fn = AI[e.def.ai] || AI.chase;
     fn(run, e, p, dt);
+    if (e.dead) return;
+    // 투명한 정예: 가끔 목표 근처로 순간이동
+    if (e.affix === 'ghost') {
+      e.ghT = (e.ghT == null ? 3 : e.ghT) - dt;
+      if (e.ghT <= 0) {
+        e.ghT = 3 + Math.random() * 2;
+        for (let k = 0; k < 10; k++) {
+          const a = Math.random() * Math.PI * 2, r = 36 + Math.random() * 24, nx = p.x + Math.cos(a) * r, ny = p.y + Math.sin(a) * r;
+          if (!G.World.solidAt(run.map, nx, ny)) { fx('burst', e.x, e.y - 6, 6, '#d7a8ff', 40, 0.4); e.x = nx; e.y = ny; fx('burst', e.x, e.y - 6, 6, '#d7a8ff', 40, 0.4); break; }
+        }
+      }
+    }
     G.World.move(run.map, e, e.vx * dt, e.vy * dt, e.r * 0.8);
     if (Math.abs(e.vx) > 3) e.f = e.vx > 0 ? 1 : -1;
     trail(run, e, dt);
     // 접촉 피해
     if (!e.under && !e.harmless) for (const q of run.players) {
       if (!Cb().active(q)) continue;
-      if (U.dist2(e.x, e.y, q.x, q.y) < (e.r + q.r - 1) * (e.r + q.r - 1)) Cb().hurt(run, q, e.dmg, { x: e.x, y: e.y });
+      if (U.dist2(e.x, e.y, q.x, q.y) < (e.r + q.r - 1) * (e.r + q.r - 1) && Cb().hurt(run, q, e.dmg, { x: e.x, y: e.y }) && (e.def.chill || e.affix === 'ice')) {
+        q.slowT = 1.6; fx('txt', q.x, q.y - 26, '으슬으슬…', '#8fd8ff', 6);
+      }
     }
     // 그림자는 빛 속에 있을 때 표시
-    if (e.def.shadow) e.lit = G.Run.inLight(run, e.x, e.y);
+    if (e.def.shadow || e.affix === 'ghost') e.lit = G.Run.inLight(run, e.x, e.y);
   };
 
   AI.chase = function (run, e, p, dt) {
@@ -187,7 +203,7 @@ G.AI = (function () {
       e.vx *= 0.85; e.vy *= 0.85; e.anim = 2;
       if (e.stT <= 0) {
         const a = U.ang(e.x, e.y, p.x, p.y), sp = 105 + run.floor * 3;
-        G.Cb.proj(run, { k: e.def.shot === 'star' ? 'estar' : 'shard', owner: -1, x: e.x, y: e.y - 6, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg: e.dmg, life: 2.4, r: 3 });
+        G.Cb.proj(run, { k: SHOT[e.def.shot] || 'shard', owner: -1, x: e.x, y: e.y - 6, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg: e.dmg, life: 2.4, r: 3, slow: e.def.shot === 'snow' ? 1.6 : 0 });
         fx('snd', 'shoot'); e.st = 'move'; e.stT = 2 + Math.random(); e.anim = 0;
       }
       return;
@@ -251,7 +267,7 @@ G.AI = (function () {
       e.vx = e.vy = 0;
       if (e.stT <= 0) {
         const a0 = U.ang(e.x, e.y, p.x, p.y);
-        for (let i = -1; i <= 1; i++) { const a = a0 + i * 0.35; G.Cb.proj(run, { k: 'estar', owner: -1, x: e.x, y: e.y - 8, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, dmg: e.dmg, life: 2.2, r: 3 }); }
+        for (let i = -1; i <= 1; i++) { const a = a0 + i * 0.35; G.Cb.proj(run, { k: SHOT[e.def.shot] || 'estar', owner: -1, x: e.x, y: e.y - 8, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, dmg: e.dmg, life: 2.2, r: 3 }); }
         fx('snd', 'shoot'); e.st = 'drift'; e.stT = 2.4 + Math.random();
       }
       return;
@@ -274,6 +290,59 @@ G.AI = (function () {
     }
     seek(run, e, p, speed(e), dt);
     if (e.stT <= 0 && U.dist(e.x, e.y, p.x, p.y) < 90) { e.st = 'charge'; e.stT = 0.85; run.tels.push({ s: 'c', x: e.x, y: e.y, a: 46, t: 0, T: 0.85, own: e.id, follow: true }); }
+  };
+
+  // 보물 두더지: 플레이어에게서 도망 (20초 지나면 땅속으로 사라짐)
+  AI.flee = function (run, e, p, dt) {
+    e.fleeT = (e.fleeT || 0) + dt;
+    if (e.fleeT > 20) {
+      e.dead = true;
+      fx('burst', e.x, e.y, 12, '#8d7055', 60, 0.5); fx('txt', e.x, e.y - 16, '뿅! 도망갔다…', '#b7a7cf', 8); fx('snd', 'burrow');
+      return;
+    }
+    let ax = 0, ay = 0;
+    for (const q of run.players) {
+      if (!Cb().active(q)) continue;
+      const d = Math.max(8, U.dist(e.x, e.y, q.x, q.y)); if (d > 170) continue;
+      ax += (e.x - q.x) / (d * d); ay += (e.y - q.y) / (d * d);
+    }
+    if (!ax && !ay) { e.vx *= 0.9; e.vy *= 0.9; e.anim = 0; return; }
+    let a = Math.atan2(ay, ax);
+    for (const off of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1]) {
+      const aa = a + off;
+      if (!G.World.solidAt(run.map, e.x + Math.cos(aa) * 14, e.y + Math.sin(aa) * 14)) { a = aa; break; }
+    }
+    steer(e, Math.cos(a) * speed(e), Math.sin(a) * speed(e), 0.2); e.anim = 1;
+    if (Math.random() < 0.08) fx('burst', e.x, e.y, 1, '#ffd36b', 20, 0.4);
+  };
+
+  // 미믹: 깜짝 놀라게 한 뒤 쉴 새 없이 뛰어듦
+  AI.mimic = function (run, e, p, dt) {
+    if (e.t < 0.8) { e.vx = e.vy = 0; e.anim = 2; return; }
+    AI.hop(run, e, p, dt);
+    if (e.st === 'idle' && e.stT > 0.4) e.stT = 0.4;
+  };
+
+  // 냠냠 꽃: 제자리에서 꽃잎 발사
+  AI.turret = function (run, e, p, dt) {
+    e.vx = 0; e.vy = 0; e.stT -= dt;
+    e.f = p.x > e.x ? 1 : -1;
+    if (e.st === 'aim') {
+      e.anim = 2;
+      if (e.stT <= 0) {
+        const a0 = U.ang(e.x, e.y, p.x, p.y);
+        for (let i = -1; i <= 1; i++) { const a = a0 + i * 0.3; G.Cb.proj(run, { k: 'petal', owner: -1, x: e.x, y: e.y - 8, vx: Math.cos(a) * 95, vy: Math.sin(a) * 95, dmg: e.dmg, life: 2.2, r: 3 }); }
+        fx('snd', 'shoot'); e.st = 'walk'; e.stT = 1.8 + Math.random(); e.anim = 0;
+      }
+      return;
+    }
+    if (e.stT <= 0 && U.dist(e.x, e.y, p.x, p.y) < 150 && G.World.los(run.map, e.x, e.y, p.x, p.y)) { e.st = 'aim'; e.stT = 0.5; }
+  };
+
+  // 꿀벌: 지그재그로 날아옴
+  AI.bee = function (run, e, p, dt) {
+    const a = U.ang(e.x, e.y, p.x, p.y), perp = a + Math.PI / 2, wob = Math.sin(e.t * 7 + e.id) * 40, sp = speed(e);
+    steer(e, Math.cos(a) * sp + Math.cos(perp) * wob, Math.sin(a) * sp + Math.sin(perp) * wob, 0.1);
   };
 
   return AI;

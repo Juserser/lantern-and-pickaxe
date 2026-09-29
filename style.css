@@ -116,3 +116,4 @@ input {
 .tb[data-b="s"] { right: 94px; bottom: 6px; }
 .tb[data-b="c"] { right: 20px; bottom: 96px; width: 56px; height: 56px; font-size: 22px; }
 .tb.tiny { right: 150px; bottom: 120px; width: 40px; height: 40px; font-size: 16px; }
+.tb.tiny.ping { right: 150px; bottom: 70px; }

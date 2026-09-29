@@ -9,9 +9,9 @@ G.Run = (function () {
   // ───────────── 생성
   RN.create = function (o) {
     const save = G.Save.data;
-    const seed = o.daily ? U.hashStr('daily-' + U.today()) : (Math.random() * 1e9) >>> 0;
+    const seed = o.daily ? U.hashStr('daily-' + U.today()) : o.weekly ? U.hashStr('weekly-' + U.weekKey()) : (Math.random() * 1e9) >>> 0;
     const run = {
-      seed, floor: 0, star: o.star || 0, daily: !!o.daily, endless: false,
+      seed, floor: 0, star: o.star || 0, daily: !!o.daily, endless: false, rush: !!o.rush, weekly: o.weekly || null,
       players: [0, 1].map(i => Cb.newPlayer(i, o.chars[i], o.names[i], o.hats[i], save)),
       team: { st: Cb.teamStats(), xp: 0, lvl: 1, xpNext: xpFor(1), heart: 0, gems: 0, stars: 0, relics: [], rerolls: 0 },
       enemies: [], projs: [], pickups: [], objects: [], hazards: [], tels: [], delayed: [], boss: null,
@@ -19,25 +19,78 @@ G.Run = (function () {
       time: 0, floorTime: 0, hitstop: 0,
       tether: { on: false, far: false, sepT: 0, tickT: 0, regenT: 0 },
       synergy: [], darkMul: 1, beamBoost: 1,
-      stats: { kills: 0, dmg: [0, 0], revives: [0, 0], combos: 0, ores: 0, gems: 0, downs: 0, hitsTaken: 0, floors: 0, nohitBoss: 0, handFloors: 0, telepathy: 0 },
+      stats: { kills: 0, dmg: [0, 0], revives: [0, 0], combos: 0, ores: 0, gems: 0, downs: 0, hitsTaken: 0, floors: 0, nohitBoss: 0, handFloors: 0, telepathy: 0,
+        moles: 0, mimics: 0, puzzles: 0, carts: 0, gambleFloor: 0, garden: 0 },
       codexKills: {}, cardsPicked: {}, relicsFound: {}, bossesKilled: [],
       hintFlags: {}, hint: null, hintT: 0, sayQ: [],
       camX: 0, camY: 0, spawnT: C.AMBIENT_SPAWN_EVERY, mapVer: 0, flowT: 0, floorHits: 0, floorFar: false,
+      // 새 기능
+      curse: {}, heat: 0, path: null, pathNow: null, fmod: null, eggsFound: 0, flowerKey: false, garden: false,
+      pings: [], pets: [], cart: null, hpMul: 1, enemySpd: 1, shopMul: 1, floorDisc: 0, noBeam: false, downTime: C.DOWN_TIME, collapseT: 0, meal: null,
     };
     for (const id of save.skills) if (G.SKILL[id]) G.SKILL[id].apply(run.team, run.players);
     run.team.st.floorHeal += Math.floor(save.garden / 2);
+    // 깊은 밤 저주
+    const curses = (o.curses || []).slice();
+    if (run.weekly === 'cursed') for (const c of U.RNG(seed).shuffle(G.CURSES).slice(0, 3)) if (!curses.includes(c.id)) curses.push(c.id);
+    for (const id of curses) if (G.CURSE[id]) { run.curse[id] = 1; run.heat += G.CURSE[id].heat; }
+    applyCurses(run);
+    applyWeekly(run);
+    applyMeal(run, save);
     run.team.heart = run.team.st.startHeart;
     run.team.rerolls = run.team.st.rerolls;
-    for (const p of run.players) p.hp = p.st.maxHp;
+    for (const p of run.players) { p.hp = p.st.maxHp; p.lightR = p.st.light; }
     if (run.team.st.startRelic) run.pendingRelic = true;
-    RN.startFloor(run, 1);
+    if (run.rush) { run.pendingLv += 5; run.pendingRelic = true; }
+    G.Pet.init(run);
+    RN.startFloor(run, run.rush ? 3 : 1);
     return run;
   };
+
+  function applyCurses(run) {
+    const cu = run.curse;
+    if (cu.dark) run.players.forEach(p => { p.st.light *= 0.7; p.st.fearMul *= 1.5; });
+    if (cu.fury) run.enemySpd *= 1.25;
+    if (cu.fragile) { run.team.st.reviveSpd *= 0.5; run.downTime = C.DOWN_TIME * 0.5; }
+    if (cu.hunger) run.team.st.floorHeal = 0;
+    if (cu.poor) run.shopMul *= 1.5;
+  }
+  function applyWeekly(run) {
+    switch (run.weekly) {
+      case 'bombfest': run.players.forEach(p => (p.st.area += 0.3)); break;
+      case 'glass': run.players.forEach(p => { p.st.maxHp = 2; p.st.dmg += 1; }); break;
+      case 'speedy': run.players.forEach(p => (p.st.spd += 0.35)); run.enemySpd *= 1.35; break;
+      case 'giant': run.hpMul *= 1.6; run.team.st.xpMul *= 2; break;
+      case 'rich': run.team.st.gemMul *= 3; run.shopMul *= 2; break;
+      case 'lonely': run.noBeam = true; run.players.forEach(p => (p.st.regen += 2)); break;
+    }
+  }
+  function applyMeal(run, save) {
+    const meal = save.meal; if (!meal || !G.RECIPE[meal]) return;
+    const all = meal === 'rainbow';
+    if (all || meal === 'tempura') run.players.forEach(p => (p.st.maxHp += 2));
+    if (all || meal === 'bungeo') run.players.forEach(p => (p.st.dmg += 0.1));
+    if (all || meal === 'unagi') run.players.forEach(p => { p.st.spd += 0.1; p.st.cdr *= 0.9; });
+    if (all || meal === 'sushi') run.pendingLv += 2;
+    run.meal = meal; save.meal = null; G.Save.write();
+  }
+
+  // 벽 옆 바위를 광석으로 (황금 층, 보물 굴)
+  function goldify(m, rng, chance) {
+    const T = G.T;
+    for (let y = 1; y < m.h - 1; y++) for (let x = 1; x < m.w - 1; x++) {
+      const k = y * m.w + x; if (m.tiles[k] !== T.ROCK) continue;
+      const adj = m.tiles[k - 1] === T.FLOOR || m.tiles[k + 1] === T.FLOOR || m.tiles[k - m.w] === T.FLOOR || m.tiles[k + m.w] === T.FLOOR;
+      if (adj && rng.chance(chance)) m.tiles[k] = rng.chance(0.15) ? T.BIGORE : rng.chance(0.05) ? T.RAINBOW : T.ORE;
+    }
+  }
+  // 벽 속이면 가까운 빈 칸으로
+  function freeSpot(run, x, y) { const b = { x, y }; G.World.unstick(run.map, b, 5); return b; }
 
   // ───────────── 층 시작
   RN.startFloor = function (run, n) {
     run.floor = n;
-    const biome = G.biomeOf(n);
+    const biome = G.biomeOf(n, run.garden);
     const boss = G.isBossFloor(n);
     const gen = boss ? G.World.generateBoss(run.seed + n * 7919, n, biome) : G.World.generate(run.seed + n * 7919, n, biome);
     run.map = gen.map; run.info = gen.info;
@@ -46,27 +99,60 @@ G.Run = (function () {
     run.boss = null; run.bossFight = false; run.darkMul = 1; run.beamBoost = 1;
     run.floorTime = 0; run.floorHits = 0; run.floorFar = false; run.exitT = 0; run.defeatT = 0; run.challenge = null; run.noFearFloor = false;
     run.spawnT = C.AMBIENT_SPAWN_EVERY;
+    run.cart = null; run.pings = []; run.collapseT = 0; run.collapseWarn = false;
+    const path = boss ? null : run.path;
+    run.path = null; run.pathNow = path;
+    run.floorDisc = path === 'shop' ? 0.2 : 0;
+    const rng = U.RNG(run.seed + n * 131);
+    // 특별한 층
+    run.fmod = null;
+    if (!boss && !run.rush && n >= 2 && rng.chance(path === 'mystery' ? 0.7 : 0.12)) run.fmod = rng.pick(Object.keys(G.FLOOR_MODS));
+    if (run.fmod === 'gold') goldify(run.map, rng, 0.35);
+    if (path === 'treasure') goldify(run.map, rng, 0.15);
+    if (run.fmod === 'blackout') { run.darkMul = 0.45; run.beamBoost = 2; }
     const st = run.info.start;
     run.players.forEach((p, i) => {
-      p.x = st.x + (i ? 9 : -9); p.y = st.y; p.vx = p.vy = 0;
+      p.x = st.x + (i ? 9 : -9); p.y = st.y; p.vx = p.vy = 0; p.riding = false;
       G.World.unstick(run.map, p, p.r);
       if (p.state !== 'n') { p.state = 'n'; p.hp = Math.max(p.hp, C.REVIVE_HP); }
       p.phoenixUsed = false; p.featherUsed = false; p.mineTemp = false; p.lightTemp = false;
       p.lightR = p.st.light; p.fear = 0; p.inv = 1.5; p.dashT = 0;
       if (n > 1 && run.team.st.floorHeal) Cb.heal(run, p, run.team.st.floorHeal, true);
+      if (path === 'camp') p.hp = p.st.maxHp;
     });
     run.camX = st.x; run.camY = st.y; run.camSnap = true;
-    const rng = U.RNG(run.seed + n * 131);
     // 문
     if (!boss) run.objects.push({ id: U.id(), k: 'door', x: run.info.exit.x, y: run.info.exit.y, st: 0, prog: 0 });
     // 방
     for (const r of run.info.rooms) {
       if (r.type === 'shop') run.objects.push({ id: U.id(), k: 'shop', x: r.x, y: r.y, st: 0, items: shopItems(run, rng) });
-      if (r.type === 'fountain') run.objects.push({ id: U.id(), k: 'fountain', x: r.x, y: r.y, st: 0 });
+      if (r.type === 'fountain' && !run.curse.poor) run.objects.push({ id: U.id(), k: 'fountain', x: r.x, y: r.y, st: 0 });
       if (r.type === 'altar') run.objects.push({ id: U.id(), k: 'altar', x: r.x, y: r.y, st: 0 });
-      if (r.type === 'event') run.objects.push({ id: U.id(), k: 'event', x: r.x, y: r.y, st: 0, ex: rng.pick(['wish', 'babybat', 'cricket', 'shroom', 'sign', 'wish']) });
+      if (r.type === 'event') run.objects.push({ id: U.id(), k: 'event', x: r.x, y: r.y, st: 0, ex: rng.pick(EVENT_KEYS) });
+      if (r.type === 'plates') {
+        const pid = U.id();
+        run.objects.push({ id: U.id(), k: 'plate', x: r.x - 30, y: r.y + 8, st: 0, pid }, { id: U.id(), k: 'plate', x: r.x + 30, y: r.y + 8, st: 0, pid });
+        run.objects.push({ id: U.id(), k: 'chest', x: r.x, y: r.y - 16, st: 0, locked: pid, bonus: true });
+      }
+      if (r.type === 'bells') {
+        const pid = U.id();
+        run.objects.push({ id: U.id(), k: 'bell', x: r.x, y: r.y, st: 0, pid, first: true }, { id: U.id(), k: 'bell', x: r.x2, y: r.y2, st: 0, pid });
+      }
     }
-    if (run.info.chest) run.objects.push({ id: U.id(), k: 'chest', x: run.info.chest.x, y: run.info.chest.y, st: 0, hidden: run.info.chest.hidden });
+    if (run.info.chest) {
+      const c = run.info.chest;
+      const o = { id: U.id(), k: 'chest', x: c.x, y: c.y, st: 0, hidden: c.hidden };
+      if (!c.hidden && n >= 2 && rng.chance(0.15)) o.mimic = true;
+      if (c.hidden && (n === 10 || n === 11) && !run.flowerKey && !run.rush && rng.chance(0.5)) o.key = true;
+      run.objects.push(o);
+    }
+    if (run.info.cart) { const c = run.info.cart; run.objects.push({ id: U.id(), k: 'cart', x: c.x0, y: c.y, st: 0, x1: c.x1 }); }
+    // 갈림길 보너스: 몬스터 무리 자리를 빌려 배치
+    const takePack = () => (run.info.packs.length ? run.info.packs.splice(rng.int(0, run.info.packs.length - 1), 1)[0] : null);
+    if (path === 'treasure') for (let i = 0; i < 2; i++) { const pk = takePack(); if (pk) run.objects.push({ id: U.id(), k: 'chest', x: pk.x, y: pk.y, st: 0, bonus: true }); }
+    if (path === 'shop' && !run.objects.some(o => o.k === 'shop')) { const pk = takePack(); if (pk) run.objects.push({ id: U.id(), k: 'shop', x: pk.x, y: pk.y, st: 0, items: shopItems(run, rng) }); }
+    if (path === 'mystery') for (let i = 0; i < 2; i++) { const pk = takePack(); if (pk) run.objects.push({ id: U.id(), k: 'event', x: pk.x, y: pk.y, st: 0, ex: rng.pick(EVENT_KEYS) }); }
+    if (path === 'camp') { const b = freeSpot(run, st.x, st.y - 22); run.objects.push({ id: U.id(), k: 'camp', x: b.x, y: b.y, st: 0 }); }
     // 조합 보조
     if (!boss) {
       if (!run.players.some(p => G.CHARS[p.c].miner)) run.pickups.push({ id: U.id(), k: 'pickcrate', x: st.x + 20, y: st.y + 10, vx: 0, vy: 0, v: 1, t: 0 });
@@ -76,9 +162,11 @@ G.Run = (function () {
     if (boss) {
       G.Boss.spawn(run, biome.boss, run.info.arena.x, run.info.arena.y);
     } else {
-      for (const pk of run.info.packs) {
-        const cnt = 2 + rng.int(0, 2) + Math.floor(n / 4);
-        let elite = rng.chance(0.08 + n * 0.012);
+      const packMul = (run.fmod === 'baby' ? 1.8 : 1) * (path === 'battle' ? 1.5 : 1);
+      const eliteP = 0.08 + n * 0.012 + (path === 'battle' ? 0.15 : 0) + (run.curse.elite ? 0.25 : 0);
+      run.info.packs.forEach((pk, pi) => {
+        const cnt = Math.round((2 + rng.int(0, 2) + Math.floor(n / 4)) * packMul);
+        let elite = rng.chance(eliteP) || (run.curse.elite && pi === 0);
         for (let i = 0; i < cnt; i++) {
           const type = rng.pick(biome.enemies);
           const a = rng() * Math.PI * 2, r = rng.range(4, 20);
@@ -87,19 +175,30 @@ G.Run = (function () {
           RN.spawnEnemy(run, type, x, y, { elite, noPop: true, dormant: true });
           elite = false;
         }
+      });
+      // 보물 두더지
+      if (!run.rush && run.info.packs.length && rng.chance(0.25)) {
+        const pk = rng.pick(run.info.packs);
+        RN.spawnEnemy(run, 'goldmole', pk.x, pk.y, { noPop: true, dormant: true });
       }
     }
     RN.computeLight(run);
     G.AI.flow(run);
+    G.Pet.place(run);
     fx('music', boss ? 'none' : biome.music);
     const fi = ((n - 1) % 3) + 1;
-    fx('banner', biome.name + (n > 12 ? ` ${n}층` : ` ${Math.ceil(n / 3)}-${fi}`), boss ? '⚠ 보스의 방 ⚠' : (n === 1 ? '둘이 함께라면 무섭지 않아 💞' : ''));
+    const fm = run.fmod && G.FLOOR_MODS[run.fmod], pa = path && G.PATHS[path];
+    const sub = boss ? '⚠ 보스의 방 ⚠' : fm ? `${fm.icon} ${fm.name} — ${fm.desc}` : pa ? `${pa.icon} ${pa.name}` :
+      (n === 1 ? (run.meal ? `${G.RECIPE[run.meal].icon} ${G.RECIPE[run.meal].name} 먹고 힘내자! — ${G.RECIPE[run.meal].desc}` : '둘이 함께라면 무섭지 않아 💞') : '');
+    fx('banner', biome.name + (n > 12 ? ` ${n}층` : ` ${Math.ceil(n / 3)}-${fi}`), sub);
     if (n === 1) RN.hintOnce(run, 'move', 'WASD / 방향키로 이동 · C / . 로 공격!');
+    if (n === 2) RN.hintOnce(run, 'emote', '📍 E / \' 키로 신호를 보내요 · 방향키와 같이 누르면 감정표현!');
     if (boss) RN.hintOnce(run, 'boss' + biome.id, G.BOSSES[biome.boss].desc);
+    if (n === 13 && run.garden) { run.stats.garden = 1; fx('banner', '🌸 비밀 꽃밭 🌸', '꽃잎 열쇠가 문을 열었어요!'); }
   };
 
   function shopItems(run, rng) {
-    const m = (1 + run.floor * 0.08) * (1 - run.team.st.shopDisc);
+    const m = (1 + run.floor * 0.08) * (1 - run.team.st.shopDisc) * run.shopMul * (1 - run.floorDisc);
     const all = [
       { k: 'potion', name: '회복 물약', icon: '🧪', desc: '둘 다 2칸 회복', cost: 12 },
       { k: 'card', name: '보너스 카드', icon: '🃏', desc: '둘 다 카드 한 장씩', cost: 26 },
@@ -115,10 +214,13 @@ G.Run = (function () {
     o = o || {};
     const def = G.ENEMIES[type]; if (!def) return null;
     const f = run.floor;
-    const hpMul = (1 + (f - 1) * C.FLOOR_HP + run.star * C.STAR_HP) * (f > 12 ? 1 + (f - 12) * 0.2 : 1);
-    const elite = !!o.elite;
-    const e = { id: U.id(), type, def, x, y, r: def.r * (elite ? 1.3 : 1), hp: def.hp * hpMul * (elite ? 3.2 : 1), maxHp: 0,
-      spd: def.spd * (1 + f * 0.012) * (elite ? 0.9 : 1), dmg: def.dmg + (f >= 10 ? 1 : 0), t: Math.random() * 3,
+    const baby = run.fmod === 'baby' && type !== 'goldmole' && type !== 'mimic';
+    const hpMul = (1 + (f - 1) * C.FLOOR_HP + run.star * C.STAR_HP) * (f > 12 ? 1 + (f - 12) * 0.2 : 1) * run.hpMul * (baby ? 0.45 : 1);
+    const elite = !!o.elite && type !== 'goldmole';
+    const affix = elite ? U.rng.pick(G.AFFIX_KEYS) : null;
+    const e = { id: U.id(), type, def, x, y, r: def.r * (elite ? 1.3 : 1) * (baby ? 0.7 : 1), hp: def.hp * hpMul * (elite ? 3.2 : 1) * (affix === 'tough' ? 1.5 : 1), maxHp: 0,
+      spd: def.spd * (1 + f * 0.012) * (elite ? 0.9 : 1) * run.enemySpd * (affix === 'swift' ? 1.6 : 1), dmg: def.dmg + (f >= 10 && def.dmg ? 1 : 0), t: Math.random() * 3,
+      affix, baby, harmless: !!def.harmless,
       st: def.ai === 'burrow' ? 'under' : 'walk', stT: 0.5 + Math.random() * 1.5, vx: 0, vy: 0, kvx: 0, kvy: 0, f: 1, fa: 0,
       flash: 0, burn: 0, slowT: 0, stun: 0, frozen: 0, elite, tg: -1, anim: 0, awake: !o.dormant, popT: o.noPop ? 0 : 0.35 };
     e.maxHp = e.hp;
@@ -183,8 +285,14 @@ G.Run = (function () {
     run.time += dt; run.floorTime += dt;
     if (run.hintT > 0) { run.hintT -= dt; if (run.hintT <= 0) run.hint = null; }
 
+    for (let i = 0; i < 2; i++) if (inputs[i].pe) emote(run, run.players[i], inputs[i]);
+    for (const q of run.pings) q.t += dt;
+    if (run.pings.length) run.pings = run.pings.filter(q => q.t < 4);
+    updateCart(run, dt);
     for (let i = 0; i < 2; i++) updatePlayer(run, run.players[i], inputs[i], dt);
     updateTether(run, dt);
+    G.Pet.update(run, dt);
+    updateCollapse(run, dt);
     updateCamera(run);
     if (run.lightDirty) RN.computeLight(run);
     run.flowT -= dt; if (run.flowT <= 0) { run.flowT = 0.4; G.AI.flow(run); }
@@ -241,8 +349,81 @@ G.Run = (function () {
 
   function openPause(run, who) { run.ui = { m: 'pause', sel: 0, who }; fx('snd', 'nav'); }
 
+  // ───────────── 신호 & 감정표현
+  function emote(run, p, inp) {
+    if (p.state === 'g') return;
+    const dir = Math.abs(inp.x) < 0.3 && Math.abs(inp.y) < 0.3 ? 'none' : Math.abs(inp.x) > Math.abs(inp.y) ? (inp.x > 0 ? 'right' : 'left') : (inp.y > 0 ? 'down' : 'up');
+    const em = G.EMOTES[dir];
+    fx('say', p.slot, em.text);
+    if (em.ping) {
+      run.pings = run.pings.filter(q => q.slot !== p.slot);
+      run.pings.push({ slot: p.slot, x: p.x, y: p.y, t: 0, help: dir === 'up' });
+      fx('snd', 'tetherOn'); fx('ring', p.x, p.y - 4, 4, 26, G.COLORS.p[p.slot], 0.5);
+    }
+  }
+  RN.emote = emote;
+
+  // ───────────── 광차
+  function boardCart(run, o, p) {
+    const act = run.players.filter(Cb.active);
+    if (act.some(a => U.dist(a.x, a.y, o.x, o.y) > 34)) {
+      fx('say', p.slot, '같이 타자! 🛒');
+      RN.hintOnce(run, 'cart', '광차는 둘이 함께 옆에 있어야 출발해요 🛒');
+      return;
+    }
+    o.st = 1;
+    run.cart = { o, x: o.x, y: o.y, x1: o.x1, lastTx: -1, hit: new Set() };
+    act.forEach(a => { a.riding = true; a.state = 'n'; });
+    fx('banner', '광차 출발! 🛒💨', '레일 옆 광석을 싹 쓸어 가요'); fx('snd', 'dash');
+  }
+  function updateCart(run, dt) {
+    const c = run.cart; if (!c) return;
+    c.x = Math.min(c.x1, c.x + 165 * dt);
+    c.o.x = c.x;
+    const tx = Math.floor(c.x / S), ty = Math.floor(c.y / S);
+    if (tx !== c.lastTx) {
+      c.lastTx = tx;
+      for (const dy of [-1, 1]) {
+        const t = G.World.get(run.map, tx, ty + dy);
+        if (t === G.T.ORE || t === G.T.BIGORE || t === G.T.RAINBOW) Cb.mineTile(run, tx, ty + dy, 9, run.players[0]);
+      }
+    }
+    for (const e of Cb.allTargets(run)) {
+      if (e.boss || c.hit.has(e.id) || U.dist(c.x, c.y, e.x, e.y) > e.r + 14) continue;
+      c.hit.add(e.id);
+      Cb.hitEnemy(run, e, 40 * (1 + run.floor * 0.1), { p: run.players[0], kind: 'aoe', x: c.x - 10, y: c.y, knock: 260 });
+    }
+    if (Math.random() < 0.6) fx('burst', c.x - 10, c.y + 2, 1, '#ffd36b', 40, 0.3);
+    if (c.x >= c.x1) {
+      c.o.st = 2; run.cart = null; run.stats.carts++;
+      run.players.forEach(p => { if (p.riding) { p.riding = false; p.inv = 1; G.World.unstick(run.map, p, p.r); } });
+      fx('banner', '광차 도착! 🛒', '신난다~!'); fx('snd', 'win'); fx('shake', 4);
+    }
+  }
+
+  // ───────────── 무너지는 동굴 (저주)
+  function updateCollapse(run, dt) {
+    if (!run.curse.collapse || G.isBossFloor(run.floor)) return;
+    const T0 = C.COLLAPSE_AT;
+    if (run.floorTime > T0 - 15 && !run.collapseWarn) { run.collapseWarn = true; fx('banner', '천장이 흔들려요…', '서둘러 출구로! 🪨'); fx('shake', 3); }
+    if (run.floorTime < T0) return;
+    run.collapseT -= dt;
+    if (run.collapseT > 0) return;
+    run.collapseT = Math.max(0.5, 2.4 - (run.floorTime - T0) * 0.03);
+    for (const p of run.players) {
+      if (!Cb.active(p)) continue;
+      const x = p.x + (Math.random() - 0.5) * 70, y = p.y + (Math.random() - 0.5) * 50;
+      run.tels.push({ s: 'c', x, y, a: 14, t: 0, T: 1.0 });
+      run.delayed.push({ t: 1.0, fn: () => {
+        fx('burst', x, y, 10, ['#8d7b6a', '#5a4a3e'], 60, 0.5); fx('snd', 'break'); fx('shake', 2);
+        for (const q of run.players) if (Cb.active(q) && U.dist(q.x, q.y, x, y) < 14 + q.r) Cb.hurt(run, q, 1, { x, y });
+      } });
+    }
+  }
+
   // ───────────── 플레이어
   function updatePlayer(run, p, inp, dt) {
+    if (run.fmod === 'reverse') inp = Object.assign({}, inp, { x: -inp.x, y: -inp.y });
     p.ix = inp.x; p.iy = inp.y;
     if (p.inv > 0) p.inv -= dt;
     if (p.flash > 0) p.flash -= dt;
@@ -250,6 +431,13 @@ G.Run = (function () {
     if (p.buffT > 0) p.buffT -= dt;
     if (p.slowT > 0) p.slowT -= dt;
     const q = run.players[1 - p.slot];
+    if (p.riding && run.cart) {
+      p.x = run.cart.x + (p.slot ? 6 : -6); p.y = run.cart.y - 3; p.vx = p.vy = 0; p.moving = false; p.inv = Math.max(p.inv, 0.1);
+      if (Math.abs(inp.x) > 0.15) p.f = inp.x > 0 ? 1 : -1;
+      p.atkCd -= dt;
+      if (inp.a && p.atkCd <= 0) { Cb.attack(run, p); p.atkCd = G.CHARS[p.c].atk.cd / p.st.aspd; }
+      return;
+    }
     if (p.state === 'g') {
       const tx = q.x + (p.slot ? 14 : -14), ty = q.y - 10;
       p.x = U.lerp(p.x, tx, 0.05); p.y = U.lerp(p.y, ty, 0.05);
@@ -273,7 +461,8 @@ G.Run = (function () {
     }
     if (p.state === 'd') {
       const hit = G.World.moveSafe(run.map, p, p.dvx * dt, p.dvy * dt, p.r);
-      if (hit) {
+      const sk = G.CHARS[p.c].skill;
+      if (hit && G.CHARS[p.c].miner) {
         const a = Math.atan2(p.dvy, p.dvx);
         const tx = Math.floor((p.x + Math.cos(a) * (p.r + 4)) / S), ty = Math.floor((p.y + Math.sin(a) * (p.r + 4)) / S);
         if (G.isSolidTile(G.World.get(run.map, tx, ty))) Cb.mineTile(run, tx, ty, 3, p);
@@ -282,10 +471,11 @@ G.Run = (function () {
       for (const e of Cb.allTargets(run)) {
         if (p.dashHit.has(e.id) || U.dist(p.x, p.y, e.x, e.y) > e.r + 9) continue;
         p.dashHit.add(e.id);
-        Cb.hitEnemy(run, e, G.CHARS[p.c].skill.dmg * m, { p, kind: 'melee', x: p.x, y: p.y, knock: 160, mine: true });
+        Cb.hitEnemy(run, e, sk.dmg * m, { p, kind: 'melee', x: p.x, y: p.y, knock: 160, mine: true });
+        if (sk.freeze && !e.boss) e.frozen = Math.max(e.frozen || 0, sk.freeze);
       }
       p.afterT -= dt;
-      if (p.afterT <= 0) { p.afterT = 0.035; fx('after', p.c, p.x, p.y, p.f); }
+      if (p.afterT <= 0) { p.afterT = 0.035; fx('after', p.c, p.x, p.y, p.f); if (sk.freeze) fx('burst', p.x, p.y + 2, 2, '#bfefff', 20, 0.4); }
       p.dashT -= dt;
       if (p.dashT <= 0) { p.state = 'n'; p.vx = p.dvx * 0.2; p.vy = p.dvy * 0.2; p.inv = Math.max(p.inv, 0.15); }
       return;
@@ -297,7 +487,8 @@ G.Run = (function () {
     if (p.at > 0.5 && (ch.atk.type === 'swing' || ch.atk.type === 'bash')) spd *= 0.75;
     const mv = Math.hypot(inp.x, inp.y);
     p.moving = mv > 0.1;
-    p.vx = U.lerp(p.vx, inp.x * spd, 0.28); p.vy = U.lerp(p.vy, inp.y * spd, 0.28);
+    const grip = G.World.tileAt(run.map, p.x, p.y) === G.T.ICE ? 0.035 : 0.28;
+    p.vx = U.lerp(p.vx, inp.x * spd, grip); p.vy = U.lerp(p.vy, inp.y * spd, grip);
     if (p.moving) { p.a = Math.atan2(inp.y, inp.x); if (Math.abs(inp.x) > 0.15) p.f = inp.x > 0 ? 1 : -1; }
     G.World.moveSafe(run.map, p, p.vx * dt, p.vy * dt, p.r);
 
@@ -402,21 +593,15 @@ G.Run = (function () {
     const both = Cb.active(a) && Cb.active(b);
     const d = U.dist(a.x, a.y, b.x, b.y);
     const range = C.TETHER_RANGE * run.team.st.beamRange;
-    const on = both && d < range;
+    const on = both && d < range && !run.noBeam;
     if (on !== T.on) {
       if (on) {
         fx('snd', 'tetherOn');
         RN.hintOnce(run, 'tether', '가까이 있으면 💞 빛줄기가 생겨요! 적을 태우고 체력이 차올라요');
-        if (T.sepT > 3 && run.team.st.reunion) {
-          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-          fx('ring', mx, my, 6, 80, '#ff7aa8', 0.5); fx('hearts', mx, my, 16); fx('snd', 'bigboom'); fx('txt', mx, my - 30, '보고 싶었어! 💌', '#ff7aa8', 9);
-          for (const e of Cb.allTargets(run)) if (U.dist(mx, my, e.x, e.y) < 80) Cb.hitEnemy(run, e, 30 * Cb.dmgMul(run, a), { p: a, kind: 'aoe', x: mx, y: my, knock: 150 });
-          Cb.heal(run, a, 1, true); Cb.heal(run, b, 1, true);
-        }
       } else if (both) fx('snd', 'tetherOff');
       T.on = on;
     }
-    T.far = both && d > C.TETHER_FAR;
+    T.far = both && d > C.TETHER_FAR && !run.noBeam;
     if (T.far) { T.sepT += dt; run.floorFar = true; } else if (on) T.sepT = 0;
     if (!on) return;
     const syn = run.synergy;
@@ -482,7 +667,7 @@ G.Run = (function () {
       if (h.t < 0.3) continue;
       for (const p of run.players) {
         if (!Cb.active(p) || U.dist(p.x, p.y, h.x, h.y) > h.r + 2) continue;
-        if (h.k === 'slime') p.slowT = 0.3;
+        if (h.k === 'slime' || h.k === 'honey') p.slowT = h.k === 'honey' ? 0.5 : 0.3;
         else if (h.k === 'fire' || h.k === 'lavapool' || h.k === 'spore') Cb.hurt(run, p, 1, null);
       }
     }
@@ -511,12 +696,12 @@ G.Run = (function () {
   }
 
   // ───────────── 오브젝트
-  const INTERACT = { shop: '상점 🐌', fountain: '소원의 샘 ⛲', event: '살펴보기 ❔', altar: '도전 시작 ⚔️', chest: '상자 열기 🎁' };
+  const INTERACT = { shop: '상점 🐌', fountain: '소원의 샘 ⛲', event: '살펴보기 ❔', altar: '도전 시작 ⚔️', chest: '상자 열기 🎁', bell: '종 치기 🔔', cart: '광차 타기 🛒', camp: '모닥불 🔥' };
   function nearInteract(run, p) {
     let best = null, bd = 26;
     for (const o of run.objects) {
       if (!INTERACT[o.k]) continue;
-      if ((o.k === 'fountain' || o.k === 'event' || o.k === 'altar' || o.k === 'chest') && o.st !== 0) continue;
+      if ((o.k === 'fountain' || o.k === 'event' || o.k === 'altar' || o.k === 'chest' || o.k === 'bell' || o.k === 'cart' || o.k === 'camp') && o.st !== 0) continue;
       const d = U.dist(p.x, p.y, o.x, o.y);
       if (d < bd) { bd = d; best = o; }
     }
@@ -534,17 +719,52 @@ G.Run = (function () {
         break;
       case 'altar': startChallenge(run, o); break;
       case 'chest': RN.openChest(run, o); break;
+      case 'bell': ringBell(run, o, p); break;
+      case 'cart': boardCart(run, o, p); break;
+      case 'camp': run.ui = { m: 'camp', oid: o.id, sel: 0, who: p.slot, res: null }; break;
+    }
+  }
+  function ringBell(run, o, p) {
+    if (o.st !== 0) return;
+    o.rungT = run.time;
+    fx('snd', 'unseal'); fx('ring', o.x, o.y - 10, 4, 30, '#ffd36b', 0.5); fx('txt', o.x, o.y - 30, '댕~ 🔔', '#ffd36b', 8);
+    const other = run.objects.find(q => q.k === 'bell' && q.pid === o.pid && q !== o);
+    if (other && run.time - (other.rungT == null ? -9 : other.rungT) <= 1.0) {
+      o.st = other.st = 2;
+      const b = o.first ? o : other;
+      const c = freeSpot(run, b.x, b.y + 22);
+      run.objects.push({ id: U.id(), k: 'chest', x: c.x, y: c.y, st: 0, bonus: true });
+      run.stats.puzzles++;
+      fx('banner', '종소리가 어우러졌어요! 🔔🔔', '첫 번째 종 옆에 보물 상자가 나타났어요');
+      fx('snd', 'win'); fx('hearts', o.x, o.y - 10, 10); fx('hearts', other.x, other.y - 10, 10);
+    } else {
+      RN.hintOnce(run, 'bells', '멀리 있는 종 두 개를 1초 안에 같이 쳐야 해요! 📍신호로 타이밍을 맞춰 봐요');
+      fx('say', p.slot, '저쪽 종도 같이 쳐 줘!');
     }
   }
   RN.openChest = function (run, o) {
     if (o.st !== 0) return;
+    if (o.locked) {
+      if (!o.lockSaid || run.time - o.lockSaid > 2) { o.lockSaid = run.time; fx('txt', o.x, o.y - 20, '잠겨 있어요 🔒', '#b7a7cf', 7); RN.hintOnce(run, 'plates', '양쪽 발판을 둘이 동시에 밟으면 상자가 열려요! 🧩'); }
+      return;
+    }
     o.st = 1;
+    if (o.mimic) {
+      o.gone = true;
+      const e = RN.spawnEnemy(run, 'mimic', o.x, o.y, { noPop: true });
+      if (e) e.awake = true;
+      fx('txt', o.x, o.y - 24, '앗! 미믹이다! 👅', '#ff5c7a', 9); fx('snd', 'roar'); fx('shake', 4);
+      return;
+    }
     fx('snd', 'chest'); fx('burst', o.x, o.y - 8, 16, ['#ffd36b', '#fff3a0', '#ffffff'], 70, 0.6);
-    Cb.drop(run, 'gem', o.x, o.y, Math.round((6 + run.floor) * run.team.st.chestMul), 1);
+    const mul = run.team.st.chestMul * (o.bonus ? 1.6 : 1);
+    Cb.drop(run, 'gem', o.x, o.y, Math.round((6 + run.floor) * mul), 1);
     Cb.drop(run, 'heart', o.x, o.y, 1, 2);
-    if (o.hidden) Cb.drop(run, 'star', o.x, o.y, 1, 1);
+    if (o.hidden || o.bonus) Cb.drop(run, 'star', o.x, o.y, 1, 1);
+    if (o.key) Cb.drop(run, 'key', o.x, o.y, 1, 1);
+    if (Math.random() < (o.bonus ? 0.35 : o.hidden ? 0.25 : 0.06)) Cb.drop(run, 'egg', o.x, o.y, 1, 1);
     run.pendingLv++;
-    fx('txt', o.x, o.y - 24, o.hidden ? '숨겨진 보물! ✨' : '보물 상자!', '#ffd36b', 9);
+    fx('txt', o.x, o.y - 24, o.key ? '꽃잎 열쇠가 들어 있어요! 🌸' : o.hidden ? '숨겨진 보물! ✨' : o.bonus ? '협동 보물! 💞' : '보물 상자!', '#ffd36b', 9);
   };
   function startChallenge(run, o) {
     o.st = 1;
@@ -580,8 +800,24 @@ G.Run = (function () {
         if (o.life <= 0) run.objects.splice(i, 1);
       } else if (o.k === 'chest' && o.st === 0) {
         for (const p of run.players) if (Cb.active(p) && U.dist(p.x, p.y, o.x, o.y) < 12) RN.openChest(run, o);
+      } else if (o.k === 'plate' && o.st !== 2) {
+        const on = run.players.some(p => Cb.active(p) && U.dist(p.x, p.y, o.x, o.y) < 10);
+        if (on && !o.st) { fx('snd', 'nav'); RN.hintOnce(run, 'plates', '양쪽 발판을 둘이 동시에 밟으면 상자가 열려요! 🧩'); }
+        o.st = on ? 1 : 0;
       }
     }
+    for (const o of run.objects) if (o.k === 'chest' && o.locked) {
+      const pl = run.objects.filter(q => q.k === 'plate' && q.pid === o.locked);
+      if (pl.length && pl.every(q => q.st === 1)) {
+        o.hold = (o.hold || 0) + dt;
+        if (o.hold >= 0.8) {
+          o.locked = 0; pl.forEach(q => (q.st = 2)); run.stats.puzzles++;
+          fx('snd', 'unseal'); fx('ring', o.x, o.y - 8, 4, 40, '#ffd36b', 0.5); fx('txt', o.x, o.y - 30, '철컥! 열렸어요 🧩', '#ffd36b', 9);
+          fx('hearts', o.x, o.y - 10, 10);
+        }
+      } else o.hold = 0;
+    }
+    if (run.objects.some(o => o.gone)) run.objects = run.objects.filter(o => !o.gone);
     // 도전
     const ch = run.challenge;
     if (ch) {
@@ -614,10 +850,27 @@ G.Run = (function () {
     fx('snd', 'door');
     run.stats.floors = Math.max(run.stats.floors, run.floor);
     if (!run.floorFar) run.stats.handFloors++;
-    if (run.floor === 12 && !run.endless) { openEnding(run); return; }
+    if (run.players.some(p => Object.keys(p.cards).filter(id => G.CARD[id].r === 'g').length >= 3)) run.stats.gambleFloor++;
+    if (run.pathNow === 'battle') { run.pendingLv++; fx('txt', run.camX, run.camY - 40, '전투 굴 보상: 카드 +1 ⚔️', '#ffd36b', 9); }
+    if (run.rush) {
+      if (run.floor >= 12) { openResult(run, true); return; }
+      run.pendingLv += 2;
+    } else if (run.floor === 12 && !run.endless) { openEnding(run); return; }
     run.nextFloorPending = true;
     run.pendingRelic = true;
     openRelic(run);
+  }
+  // 다음 층으로: 보스 층 앞이 아니면 갈림길 고르기
+  function goNext(run) {
+    run.nextFloorPending = false;
+    const n = run.rush ? run.floor + 3 : run.floor + 1;
+    if (!run.rush && !G.isBossFloor(n)) openPath(run, n);
+    else RN.startFloor(run, n);
+  }
+  function openPath(run, n) {
+    const keys = U.rng.shuffle(Object.keys(G.PATHS)).slice(0, 3);
+    run.ui = { m: 'path', c: keys, sel: [1, 1], done: [false, false], n, rps: null, res: null, pick: null, t: 0 };
+    fx('snd', 'chest');
   }
 
   // ───────────── UI (메뉴)
@@ -635,13 +888,14 @@ G.Run = (function () {
         for (let i = 0; i < 2; i++) {
           const inp = inputs[i];
           if (ui.done[i]) { if (inp.ps) { ui.done[i] = false; fx('snd', 'back'); } continue; }
-          nav(inp, 3, i);
+          if (ui.c[i].length) nav(inp, ui.c[i].length, i);
           if (inp.pa) { ui.done[i] = true; fx('snd', 'pick'); }
           else if (inp.ps && run.team.rerolls > 0) { run.team.rerolls--; ui.c[i] = rollCards(run, run.players[i]); fx('snd', 'buy'); }
         }
         if (ui.done[0] && ui.done[1]) {
           for (let i = 0; i < 2; i++) {
             const p = run.players[i], card = G.CARD[ui.c[i][ui.sel[i]]];
+            if (!card) continue;
             p.cards[card.id] = (p.cards[card.id] || 0) + 1;
             card.apply(p, run.team);
             run.cardsPicked[card.id] = (run.cardsPicked[card.id] || 0) + 1;
@@ -667,7 +921,7 @@ G.Run = (function () {
           run.synergy = Cb.synergies(run);
           fx('snd', 'pick'); run.relicTurn++;
           run.ui = null; run.pendingRelic = false;
-          if (run.nextFloorPending) { run.nextFloorPending = false; RN.startFloor(run, run.floor + 1); }
+          if (run.nextFloorPending) goNext(run);
         }
         break;
       }
@@ -756,6 +1010,60 @@ G.Run = (function () {
         }
         break;
       }
+      case 'path': {
+        ui.t += dt;
+        if (ui.res) {
+          if (ui.t > 0.6 && (inputs[0].pa || inputs[1].pa)) { run.path = ui.pick; run.ui = null; RN.startFloor(run, ui.n); }
+          break;
+        }
+        if (!ui.rps) {
+          for (let i = 0; i < 2; i++) {
+            const inp = inputs[i];
+            if (ui.done[i]) { if (inp.ps) { ui.done[i] = false; fx('snd', 'back'); } continue; }
+            nav(inp, ui.c.length, i);
+            if (inp.pa) { ui.done[i] = true; fx('snd', 'pick'); }
+          }
+          if (ui.done[0] && ui.done[1]) {
+            if (ui.sel[0] === ui.sel[1]) {
+              ui.pick = ui.c[ui.sel[0]]; ui.t = 0; fx('snd', 'win');
+              ui.res = `둘 다 「${G.PATHS[ui.pick].name}」! 마음이 통했어요 💞`;
+            } else { ui.rps = { sel: [0, 0], done: [false, false], round: 1, msg: '', last: null }; fx('snd', 'warn'); }
+          }
+        } else {
+          const r = ui.rps;
+          for (let i = 0; i < 2; i++) {
+            const inp = inputs[i]; if (r.done[i]) continue;
+            if (inp.pl || inp.pu) { r.sel[i] = (r.sel[i] + 2) % 3; fx('snd', 'nav'); }
+            if (inp.pr || inp.pd) { r.sel[i] = (r.sel[i] + 1) % 3; fx('snd', 'nav'); }
+            if (inp.pa) { r.done[i] = true; fx('snd', 'pick'); }
+          }
+          if (r.done[0] && r.done[1]) {
+            const a = r.sel[0], b = r.sel[1];
+            r.last = [a, b];
+            if (a === b) { r.done = [false, false]; r.round++; r.msg = `${G.RPS[a].icon} ${G.RPS[b].icon} 비겼다! 한 번 더!`; fx('snd', 'comboFail'); }
+            else {
+              const w = (a - b + 3) % 3 === 1 ? 0 : 1;
+              ui.pick = ui.c[ui.sel[w]]; ui.winner = w; ui.t = 0; fx('snd', 'win');
+              ui.res = `${G.RPS[a].icon} vs ${G.RPS[b].icon}  ${run.players[w].name} 승리!\n「${G.PATHS[ui.pick].name}」로 가요!`;
+            }
+          }
+        }
+        break;
+      }
+      case 'camp': {
+        const inp = inputs[ui.who], o = run.objects.find(x => x.id === ui.oid);
+        if (ui.res) { if (inp.pa || inp.ps) run.ui = null; break; }
+        nav(inp, 3);
+        if (inp.ps) { run.ui = null; break; }
+        if (inp.pa) {
+          if (ui.sel === 2) { run.ui = null; break; }
+          if (o) o.st = 1;
+          run.players.forEach(p => { if (p.state === 'x' || p.state === 'g') { p.state = 'n'; p.hp = C.REVIVE_HP; p.inv = 1.5; } });
+          if (ui.sel === 0) { run.players.forEach(p => { p.st.maxHp += 2; p.hp = p.st.maxHp; }); ui.res = '모닥불 앞에서 푹 쉬었어요…\n둘 다 최대 체력 +1칸, 체력 가득 🔥'; fx('snd', 'heal'); }
+          else { run.pendingLv += 1; run.team.rerolls += 1; ui.res = '모닥불 앞에서 카드를 다듬었어요!\n카드 한 장씩 + 새로고침 1장 🃏'; fx('snd', 'pick'); }
+        }
+        break;
+      }
       case 'pause': {
         const inp = inputs[ui.who];
         for (let i = 0; i < 2; i++) if (i !== ui.who && inputs[i].pp) { run.ui = null; return; }
@@ -779,10 +1087,14 @@ G.Run = (function () {
       case 'result': {
         ui.t = (ui.t || 0) + dt;
         if (ui.t > 1.2 && (inputs[0].pa || inputs[1].pa)) {
-          if (ui.win && !run.endless && ui.sel === 1) { run.endless = true; run.ui = null; run.resultApplied = false; RN.startFloor(run, 13); break; }
+          if (ui.data.more && ui.sel === 1) {
+            run.endless = true; run.ui = null; run.resultApplied = false;
+            if (run.flowerKey) run.garden = true;
+            RN.startFloor(run, 13); break;
+          }
           run.finished = true;
         }
-        if (ui.win && !run.endless) nav(inputs[0].pu || inputs[0].pd ? inputs[0] : inputs[1], 2);
+        if (ui.data.more) nav(inputs[0].pu || inputs[0].pd ? inputs[0] : inputs[1], 2);
         break;
       }
     }
@@ -793,17 +1105,16 @@ G.Run = (function () {
     const q = run.players[1 - p.slot];
     const pool = G.CARDS.filter(c => (p.cards[c.id] || 0) < c.max);
     const w = c => {
-      let base = { c: 60, r: 26 + luck * 7, l: run.team.lvl >= 4 ? 5 + luck * 3 : 0, u: 10 }[c.r];
-      if (c.tag !== 'u') {
-        const mine = Cb.tagCount(p, c.tag), theirs = Cb.tagCount(q, c.tag);
-        if (mine > 0) base *= 1.5;
-        if (theirs > 0) base *= 1.25;
-      }
+      let base = { c: 60, r: 26 + luck * 7, l: run.team.lvl >= 4 ? 5 + luck * 3 : 0, g: run.team.lvl >= 3 ? 8 : 0 }[c.r];
+      const mine = Cb.tagCount(p, c.tag), theirs = Cb.tagCount(q, c.tag);
+      if (mine > 0) base *= 1.5;
+      if (theirs > 0) base *= 1.25;
       return base;
     };
     const out = [];
     const rng = U.rng;
-    for (let k = 0; k < 3 && pool.length; k++) {
+    const n = run.curse.narrow ? 2 : 3;
+    for (let k = 0; k < n && pool.length; k++) {
       const c = rng.weighted(pool, w);
       out.push(c.id);
       pool.splice(pool.indexOf(c), 1);
@@ -811,14 +1122,17 @@ G.Run = (function () {
     return out;
   }
   function openLevelUp(run) {
-    run.ui = { m: 'lvl', c: [rollCards(run, run.players[0]), rollCards(run, run.players[1])], sel: [1, 1], done: [false, false], lv: run.team.lvl };
+    const c = [rollCards(run, run.players[0]), rollCards(run, run.players[1])];
+    if (!c[0].length && !c[1].length) { run.pendingLv = 0; run.team.gems += 10; return; }
+    run.ui = { m: 'lvl', c, sel: c.map(l => Math.max(0, Math.min(run.curse.narrow ? 0 : 1, l.length - 1))), done: c.map(l => !l.length), lv: run.team.lvl };
     fx('snd', 'levelup');
   }
   function openRelic(run) {
     const owned = new Set(run.team.relics);
     const pool = U.rng.shuffle(G.RELICS.filter(r => !owned.has(r.id)));
-    if (!pool.length) { run.pendingRelic = false; if (run.nextFloorPending) { run.nextFloorPending = false; RN.startFloor(run, run.floor + 1); } return; }
-    run.ui = { m: 'relic', c: pool.slice(0, 3).map(r => r.id), sel: 1, who: run.relicTurn % 2, next: run.nextFloorPending };
+    if (!pool.length) { run.pendingRelic = false; if (run.nextFloorPending) goNext(run); return; }
+    const c = pool.slice(0, 3).map(r => r.id);
+    run.ui = { m: 'relic', c, sel: Math.min(1, c.length - 1), who: run.relicTurn % 2, next: run.nextFloorPending };
     fx('snd', 'chest');
   }
   function openEnding(run) {
@@ -836,15 +1150,17 @@ G.Run = (function () {
   function openResult(run, win, gaveUp) {
     if (run.ui && run.ui.m === 'result') return;
     const keep = win ? 1 : C.GEM_KEEP_ON_DEATH;
-    const gems = Math.floor(run.team.gems * keep);
+    const gems = Math.floor(run.team.gems * keep * (1 + run.heat * C.HEAT_GEM));
+    let extra = [];
+    if (!run.resultApplied) { run.resultApplied = true; extra = G.Hub.applyRunResult(run, win, gems) || []; }
     run.ui = { m: 'result', win, gaveUp: !!gaveUp, sel: 0, t: 0, data: {
       floor: run.floor, time: Math.floor(run.time), kills: run.stats.kills, dmg: run.stats.dmg.map(Math.round), revives: run.stats.revives.slice(),
       combos: run.stats.combos, gems, stars: run.team.stars, lvl: run.team.lvl, names: run.players.map(p => p.name), chars: run.players.map(p => p.c),
-      ores: run.stats.ores, star: run.star, daily: run.daily,
+      ores: run.stats.ores, star: run.star, daily: run.daily, heat: run.heat, rush: run.rush, weekly: run.weekly, garden: run.garden,
+      more: win && !run.endless && !run.rush, key: run.flowerKey, extra,
     } };
     fx('snd', win ? 'win' : 'gameover');
     fx('music', 'hub');
-    if (!run.resultApplied) { run.resultApplied = true; G.Hub.applyRunResult(run, win, gems); }
   }
 
   // ───────────── 이벤트 정의
@@ -874,6 +1190,35 @@ G.Run = (function () {
       { t: '지나간다', r: null },
     ] },
   };
+  EVENTS.cursedchest = { title: '으스스한 검은 상자', text: '보랏빛 연기가 새어 나오는 상자예요. 열면 좋은 게 있을 것 같은데…', opts: [
+    { t: '열어 본다 😈 (유물 + 광석, 대신 저주)', r: (run, p, o) => {
+      run.pendingRelic = true; Cb.drop(run, 'gem', o.x, o.y, 15 + run.floor, 1);
+      const left = G.CURSES.filter(c => !run.curse[c.id] && c.id !== 'narrow');
+      const c = left.length ? U.rng.pick(left) : null;
+      if (c) { run.curse[c.id] = 1; run.heat += c.heat; if (c.id === 'dark') run.players.forEach(q => { q.st.light *= 0.7; q.lightR = q.st.light; q.st.fearMul *= 1.5; }); if (c.id === 'fury') run.enemySpd *= 1.25; if (c.id === 'fragile') { run.team.st.reviveSpd *= 0.5; run.downTime = C.DOWN_TIME * 0.5; } if (c.id === 'hunger') run.team.st.floorHeal = 0; if (c.id === 'poor') run.shopMul *= 1.5; }
+      return c ? `유물과 광석을 얻었어요! 🎁\n…그런데 「${c.icon} ${c.name}」 저주가 걸렸어요 (광석 보너스 +${Math.round(c.heat * C.HEAT_GEM * 100)}%)` : '유물과 광석을 얻었어요! 🎁'; } },
+    { t: '그냥 둔다', r: null },
+  ] };
+  EVENTS.gambler = { title: '두더지 도박사', text: '"헤헤, 광석 20개 걸고 동전 던지기 한 판 어때? 이기면 두 배~"', opts: [
+    { t: '한 판 한다 🪙 (20💎)', cost: 20, r: (run, p, o) => {
+      if (Math.random() < 0.5) { run.team.gems += 45; fx('snd', 'win'); return '앞면! 광석 45개를 땄어요! 💰'; }
+      fx('snd', 'comboFail'); return '뒷면… 광석을 잃었어요 🥲\n"다음엔 이길 거야~"'; } },
+    { t: '크게 한 판 🎲 (50💎)', cost: 50, r: (run, p, o) => {
+      if (Math.random() < 0.45) { run.team.gems += 120; run.team.stars += 1; fx('snd', 'win'); return '대박! 광석 120개 + 별조각 1개! 🌟'; }
+      fx('snd', 'comboFail'); return '꽝! 도박사가 신나서 춤을 춰요… 🕺'; } },
+    { t: '도박은 안 해요', r: null },
+  ] };
+  EVENTS.onegift = { title: '작은 선물 상자', text: '"딱 한 사람만 받을 수 있는 선물이에요." 누가 받을까요?', opts: [
+    { t: '1P가 받는다 🎁', r: run => giftTo(run, 0) },
+    { t: '2P가 받는다 🎁', r: run => giftTo(run, 1) },
+    { t: '서로 양보한다 🤝 (둘 다 조금씩)', r: run => { run.players.forEach(q => { q.st.dmg += 0.05; Cb.heal(run, q, 2); }); fx('hearts', run.camX, run.camY, 16); return '서로 양보했더니 상자가 반짝! 둘 다 공격력 +5%, 회복 💞'; } },
+  ] };
+  function giftTo(run, i) {
+    const p = run.players[i];
+    p.st.dmg += 0.15; p.st.maxHp += 2; p.hp += 2;
+    return `${p.name}에게 선물! 공격력 +15%, 최대 체력 +1칸 🎁`;
+  }
+  const EVENT_KEYS = ['wish', 'babybat', 'cricket', 'shroom', 'sign', 'wish', 'cursedchest', 'gambler', 'onegift'];
   RN.EVENTS = EVENTS;
 
   // ───────────── 뷰 (렌더 & 네트워크용)
@@ -883,18 +1228,20 @@ G.Run = (function () {
       const o = nearInteract(run, p);
       return { x: r1(p.x), y: r1(p.y), c: p.c, f: p.f, a: r2(p.a), hp: p.hp, mh: p.st.maxHp, st: p.state, dt: r1(p.downT), rv: r2(p.rv), fr: Math.round(p.fear),
         sc: p.skCd > 0 ? r2(p.skCd / (p.skMax || 1)) : 0, inv: p.inv > 0 ? 1 : 0, mv: p.moving ? 1 : 0, at: r2(p.at), ar: r2(p.ar), fl: p.flash > 0 ? 1 : 0,
-        hat: p.hat, nm: p.name, lt: Math.round(p.lightR * run.darkMul), pr: o && Cb.active(p) ? INTERACT[o.k] : '', bf: p.buffT > 0 ? 1 : 0, ob: p.st.orbit, oa: r2(p.orbitA), sp: Math.round(G.CHARS[p.c].spd * p.st.spd * (p.fear >= 99 ? C.FEAR_SLOW : 1) * (p.slowT > 0 ? 0.6 : 1)) };
+        hat: p.hat, nm: p.name, lt: Math.round(p.lightR * run.darkMul), pr: o && Cb.active(p) && !p.riding ? INTERACT[o.k] : '', bf: p.buffT > 0 ? 1 : 0, ob: p.st.orbit, oa: r2(p.orbitA), sp: Math.round(G.CHARS[p.c].spd * p.st.spd * (p.fear >= 99 ? C.FEAR_SLOW : 1) * (p.slowT > 0 ? 0.6 : 1)),
+        rd: p.riding ? 1 : 0, sl: p.slowT > 0 ? 1 : 0 };
     });
     const b = run.boss;
     const v = {
       sc: 'run', mv: run.map.ver, fl: run.floor, bi: run.map.bi, cx: r1(run.camX), cy: r1(run.camY), snap: run.camSnap ? 1 : 0,
       ps: pv,
       en: run.enemies.map(e => [e.id, e.type, Math.round(e.x), Math.round(e.y),
-        (e.flash > 0 ? 1 : 0) | (e.slowT > 0 ? 2 : 0) | (e.burn > 0 ? 4 : 0) | (e.stun > 0 ? 8 : 0) | (e.elite ? 16 : 0) | (e.frozen > 0 ? 32 : 0) | (e.lit ? 64 : 0),
-        r2(Math.max(0, e.hp / e.maxHp)), e.f, e.anim | 0]),
+        (e.flash > 0 ? 1 : 0) | (e.slowT > 0 ? 2 : 0) | (e.burn > 0 ? 4 : 0) | (e.stun > 0 ? 8 : 0) | (e.elite ? 16 : 0) | (e.frozen > 0 ? 32 : 0) | (e.lit ? 64 : 0) | (e.baby ? 128 : 0),
+        r2(Math.max(0, e.hp / e.maxHp)), e.f, e.anim | 0, e.affix ? G.AFFIX_KEYS.indexOf(e.affix) + 1 : 0]),
       pr: run.projs.map(p => [p.id, p.k, Math.round(p.x), Math.round(p.y), r2(Math.atan2(p.vy, p.vx)), Math.round(p.z || 0), p.hot ? 1 : 0]),
       pk: run.pickups.map(k => [k.id, k.k, Math.round(k.x), Math.round(k.y)]),
-      ob: run.objects.map(o => [o.id, o.k, Math.round(o.x), Math.round(o.y), o.st, o.k === 'door' ? r2(o.prog || 0) : o.k === 'dome' ? o.ex : o.k === 'event' ? o.ex : 0]),
+      ob: run.objects.map(o => [o.id, o.k, Math.round(o.x), Math.round(o.y), o.st, o.k === 'door' ? r2(o.prog || 0) : o.k === 'dome' ? o.ex : o.k === 'event' ? o.ex :
+        o.k === 'chest' ? (o.locked ? 1 : 0) : o.k === 'bell' ? (o.rungT != null && run.time - o.rungT < 1 ? 1 : 0) : 0]),
       hz: run.hazards.map(h => [h.id, h.k, Math.round(h.x), Math.round(h.y), h.r, r2(h.life)]),
       tl: run.tels.map(t => [t.s, Math.round(t.x), Math.round(t.y), t.a, t.b || 0, r2(t.ang || 0), r2(Math.min(1, t.t / t.T))]),
       bs: b ? { k: b.k, x: r1(b.x), y: r1(b.y), hp: r2(Math.max(0, b.hp / b.maxHp)), ph: b.ph, s: b.s, z: Math.round(b.z || 0), a: r2(b.a), fl: b.flash > 0 ? 1 : 0, hid: b.hidden ? 1 : 0, act: b.s !== 'dormant' ? 1 : 0 } : null,
@@ -902,6 +1249,10 @@ G.Run = (function () {
       hg: Math.round(run.team.heart), xp: Math.round(run.team.xp), xn: run.team.xpNext, lv: run.team.lvl, gm: Math.floor(run.team.gems), ss: run.team.stars,
       rl: run.team.relics, rr: run.team.rerolls, star: run.star, hint: run.hint, t: Math.floor(run.time),
       ch: run.challenge ? run.challenge.wave : 0, tm: run.team.st.treasureMap ? 1 : 0,
+      fm: run.fmod, pn: run.pathNow, heat: run.heat, rush: run.rush ? 1 : 0, wk: run.weekly, key: run.flowerKey ? 1 : 0, eg: run.eggsFound,
+      cw: run.curse.collapse && !G.isBossFloor(run.floor) && run.floorTime > C.COLLAPSE_AT - 15 ? 1 : 0,
+      pg: run.pings.map(q => [q.slot, Math.round(q.x), Math.round(q.y), q.help ? 1 : 0, r2(q.t)]),
+      pt: G.Pet.view(run.pets), cu: Object.keys(run.curse),
       ui: RN.uiView(run),
     };
     run.camSnap = false;
@@ -913,6 +1264,7 @@ G.Run = (function () {
     if (ui.m === 'shop') { const ob = run.objects.find(x => x.id === ui.oid); o.items = ob ? ob.items : []; }
     if (ui.m === 'event') { const ev = EVENTS[ui.id]; o.title = ev.title; o.text = ev.text; o.opts = ev.opts.map(x => x.t); }
     if (ui.m === 'pause') {
+      o.curses = Object.keys(run.curse); o.heat = run.heat;
       o.cards = run.players.map(p => Object.entries(p.cards).map(([id, n]) => [id, n]));
       o.tags = run.players.map(p => { const t = {}; for (const k in G.TAGS) t[k] = Cb.tagCount(p, k); return t; });
       o.relics = run.team.relics; o.syn = run.synergy;
